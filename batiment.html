@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CIMEO Normandie - Diagnostic de bâtiment</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <!-- Header -->
+  <div class="header">
+    <a href="index.html" class="logo-link">
+      <div class="logo">
+        <img src="assets/logo_cimeo_normandie.png" alt="CIMEO Normandie" class="logo-image">
+        <div>
+          <div class="company-name">CIMEO Normandie</div>
+          <div class="company-tagline">Diagnostic de structures par IA</div>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <!-- Main Container -->
+  <div class="container">
+    <div class="main-card">
+      <h2 class="section-title">Diagnostic de bâtiment</h2>
+      <p class="intro-text">Évaluation complète de l'ouvrage avec recommandations techniques et matériel d'inspection adapté</p>
+
+      <!-- Formulaire bâtiment -->
+      <form id="batimentForm" class="building-form">
+        
+        <!-- Section Image/Webcam -->
+        <fieldset class="form-section">
+          <legend>📷 Photo du bâtiment</legend>
+          
+          <video id="buildingWebcam" class="media-element" autoplay playsinline muted></video>
+          <canvas id="buildingSnapshot" style="display:none;"></canvas>
+          <img id="buildingImage" class="media-element uploaded-image" alt="Photo du bâtiment" style="display:none;">
+
+          <div class="upload-area" id="buildingUpload">
+            <div class="upload-icon">📁</div>
+            <p>Glissez-déposez une image ou <strong>cliquez</strong> pour télécharger</p>
+            <span class="upload-hint">Vue d'ensemble du bâtiment recommandée</span>
+          </div>
+
+          <div class="controls">
+            <button type="button" id="captureBuilding" class="btn btn-primary">
+              📸 Capturer avec caméra
+            </button>
+            <button type="button" id="uploadBuildingBtn" class="btn btn-secondary">
+              📤 Télécharger une image
+            </button>
+            <input type="file" id="buildingFileInput" accept="image/*" style="display:none;">
+          </div>
+        </fieldset>
+
+        <!-- Section Type de bâtiment -->
+        <fieldset class="form-section">
+          <legend>🏗️ Type de structure</legend>
+          
+          <div class="form-group">
+            <label for="buildingType">Type d'ouvrage</label>
+            <select id="buildingType" name="buildingType" required>
+              <option value="">-- Sélectionnez le type --</option>
+              <option value="batiment_habitation">Bâtiment d'habitation (logements collectifs/individuels)</option>
+              <option value="batiment_tertiaire">Bâtiment tertiaire (bureaux, commerces)</option>
+              <option value="batiment_industriel">Bâtiment industriel (usine, entrepôt)</option>
+              <option value="batiment_agricole">Bâtiment agricole (hangar, silo)</option>
+              <option value="ouvrage_art">Ouvrage d'art (pont, viaduc)</option>
+              <option value="infrastructure">Infrastructure (tunnel, mur de soutènement)</option>
+              <option value="patrimoine">Bâtiment patrimonial/historique</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="structureType">Type de structure principale</label>
+            <select id="structureType" name="structureType" required>
+              <option value="">-- Sélectionnez la structure --</option>
+              <option value="beton_arme">Béton armé</option>
+              <option value="beton_precontraint">Béton précontraint</option>
+              <option value="mixte_beton_acier">Mixte béton-acier</option>
+              <option value="charpente_metallique">Charpente métallique</option>
+              <option value="charpente_bois">Charpente bois</option>
+              <option value="maconnerie_porteuse">Maçonnerie porteuse</option>
+              <option value="pierre">Pierre de taille</option>
+            </select>
+          </div>
+        </fieldset>
+
+        <!-- Section Observations / Désordres -->
+        <fieldset class="form-section">
+          <legend>⚠️ Désordres observés</legend>
+          
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" name="issues" value="fissures" class="issue-checkbox">
+              <span>Fissuration</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="issues" value="eclats" class="issue-checkbox">
+              <span>Éclats béton / Épaufrures</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="issues" value="corrosion" class="issue-checkbox">
+              <span>Corrosion armatures</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="issues" value="humidite" class="issue-checkbox">
+              <span>Infiltrations / Humidité</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="issues" value="deformation" class="issue-checkbox">
+              <span>Déformations / Flèche</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="issues" value="desagregation" class="issue-checkbox">
+              <span>Désagrégation matériaux</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="issues" value="tassement" class="issue-checkbox">
+              <span>Tassement fondations</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="issues" value="autres" class="issue-checkbox">
+              <span>Autres désordres</span>
+            </label>
+          </div>
+        </fieldset>
+
+        <!-- Section Informations Bâtiment -->
+        <fieldset class="form-section">
+          <legend>📋 Caractéristiques du bâtiment</legend>
+          
+          <div class="form-group">
+            <label for="year">Année de construction</label>
+            <input type="number" id="year" name="year" placeholder="Ex: 1985" min="1800" max="2099" required>
+          </div>
+
+          <div class="form-group">
+            <label for="floors">Nombre d'étages</label>
+            <input type="number" id="floors" name="floors" placeholder="Ex: 5" min="1" max="100" required>
+          </div>
+
+          <div class="form-group">
+            <label for="location">Localisation</label>
+            <input type="text" id="location" name="location" placeholder="Adresse complète..." required>
+          </div>
+
+          <div class="form-group">
+            <label for="context">Contexte environnemental</label>
+            <select id="context" name="context">
+              <option value="">-- Optionnel --</option>
+              <option value="urbain">Urbain dense</option>
+              <option value="periurbain">Périurbain</option>
+              <option value="rural">Rural</option>
+              <option value="littoral">Littoral (exposition chlorures)</option>
+              <option value="montagne">Montagne (cycles gel-dégel)</option>
+              <option value="industriel">Zone industrielle (pollution)</option>
+            </select>
+          </div>
+        </fieldset>
+
+        <!-- Section Actions -->
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary btn-submit">
+            📊 Générer le diagnostic
+          </button>
+          <a href="index.html" class="btn btn-outline">← Retour à l'accueil</a>
+        </div>
+      </form>
+
+      <!-- Résultat -->
+      <div id="buildingResult" class="result-section">
+        <div class="result-icon">✅</div>
+        <h3>Diagnostic du bâtiment généré</h3>
+        <p>Analyse complète des caractéristiques et préconisations d'inspection</p>
+        
+        <div class="result-details">
+          <p><strong>Type d'ouvrage :</strong> <span id="resultBuildingType"></span></p>
+          <p><strong>Structure :</strong> <span id="resultStructure"></span></p>
+          <p><strong>Année :</strong> <span id="resultYear"></span></p>
+          <p><strong>Localisation :</strong> <span id="resultLocation"></span></p>
+        </div>
+
+        <!-- Matériel requis dynamique -->
+        <div id="equipmentSection" class="equipment-section">
+          <h4>🔧 Matériel d'inspection requis</h4>
+          <div id="equipmentList" class="equipment-list"></div>
+        </div>
+
+        <!-- Préconisations -->
+        <div id="recommendationsSection" class="recommendations-section">
+          <h4>📝 Préconisations d'investigation</h4>
+          <div id="recommendationsList" class="recommendations-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>© 2024 CIMEO Normandie - Gwendal ROUAULT</p>
+    <p class="footer-subtitle">Diagnostic de structures par Intelligence Artificielle</p>
+  </div>
+
+  <!-- Scripts -->
+  <script>
+    const buildingWebcam = document.getElementById('buildingWebcam');
+    const buildingCanvas = document.getElementById('buildingSnapshot');
+    const buildingCtx = buildingCanvas.getContext('2d');
+    const buildingImage = document.getElementById('buildingImage');
+    const buildingForm = document.getElementById('batimentForm');
+    const buildingResult = document.getElementById('buildingResult');
+    let buildingStream = null;
+
+    // Matériel par type de structure
+    const equipmentByStructure = {
+      beton_arme: [
+        "Pachomètre (détecteur d'armatures) - localisation, enrobage, diamètre",
+        "Scléromètre (marteau de Schmidt) - résistance superficielle béton",
+        "Auscultation sonique/ultrasonique - détection vides, défauts internes",
+        "Carottage béton - prélèvement échantillons laboratoire",
+        "Fissuromètre digital 0.05-5mm - mesure ouverture fissures",
+        "pH-mètre / Test carbonatation - profondeur carbonatation",
+        "Potentiel d'électrode - corrosion armatures",
+        "Caméra thermique - détection défauts, humidité"
+      ],
+      beton_precontraint: [
+        "Pachomètre haute précision - détection câbles précontrainte",
+        "Gammagraphie - localisation exacte armatures/câbles",
+        "Contrôle ultrasonique avancé - intégrité béton, injection gaines",
+        "Mesure force précontrainte résiduelle - vérin creux",
+        "Endoscopie - inspection gaines injection",
+        "Carottage orienté - vérification injection, qualité béton",
+        "Géoradar - cartographie armatures 3D",
+        "Fissuromètre électronique - monitoring continu"
+      ],
+      charpente_metallique: [
+        "Contrôle dimensionnel - pied à coulisse, palmer",
+        "Contrôle ultrasonique - épaisseur, défauts internes",
+        "Magnétoscopie - détection fissures surface/sous-surface",
+        "Ressuage (liquide pénétrant) - fissures débouchantes",
+        "Mesure épaisseur peinture - jauge revêtement",
+        "Détecteur corrosion - mesure perte épaisseur",
+        "Contrôle boulonnerie - clé dynamométrique",
+        "Inspection soudures - loupe, endoscope"
+      ],
+      charpente_bois: [
+        "Hygromètre à pointes - taux d'humidité bois",
+        "Résistographe - densité bois, détection altérations",
+        "Endoscope - inspection cavités, zones inaccessibles",
+        "Marteau de sondage - détection zones altérées",
+        "Pénétromètre bois - dureté superficielle",
+        "Détecteur insectes xylophages - inspection parasites",
+        "Caméra thermique - détection humidité, défauts",
+        "Jauge contrainte mécanique - déformations, flèches"
+      ],
+      maconnerie_porteuse: [
+        "Endoscope rigide/souple - inspection joints, cavités",
+        "Carottage maçonnerie - prélèvement échantillons",
+        "Contrôle humidité - hygromètre maçonnerie",
+        "Marteau géologue - identification matériaux",
+        "Fissuromètre - suivi fissuration",
+        "Nivellement laser - mesure déformations, tassements",
+        "Caméra thermique - ponts thermiques, humidité",
+        "Test compression in-situ - vérin plat"
+      ],
+      pierre: [
+        "Endoscope - inspection joints, cavités",
+        "Hygromètre pierre - taux humidité",
+        "Scléromètre pierre - dureté superficielle",
+        "Test perméabilité Karsten - absorption eau",
+        "Loupe binoculaire x20 - analyse altérations",
+        "Colorimétrie - mesure altération chromatique",
+        "Carottage pierre - échantillons laboratoire",
+        "Fissuromètre - monitoring fissuration"
+      ],
+      mixte_beton_acier: [
+        "Pachomètre - détection armatures béton",
+        "Contrôle ultrasonique - béton et acier",
+        "Magnétoscopie - fissures acier",
+        "Scléromètre - résistance béton",
+        "Mesure épaisseur - acier (ultrasons)",
+        "Fissuromètre - interface béton-acier",
+        "Caméra thermique - défauts, délaminage",
+        "Potentiel électrode - corrosion"
+      ]
+    };
+
+    // Préconisations selon désordres
+    const investigationsByIssue = {
+      fissures: [
+        "Pose de témoins fissuromètres pour suivi évolution",
+        "Caractérisation type fissuration (structurelle, retrait, thermique)",
+        "Investigation sur origines : fondations, surcharges, matériaux",
+        "Analyse orientation et distribution des fissures"
+      ],
+      eclats: [
+        "Sondage enrobage béton - mesure profondeur altération",
+        "Test carbonatation - détermination profondeur neutralisation",
+        "Analyse causes : corrosion, gel-dégel, alcali-réaction",
+        "Évaluation étendue et profondeur épaufrures"
+      ],
+      corrosion: [
+        "Mesure potentiel d'électrode - cartographie zones corrosion",
+        "Mesure vitesse corrosion - technique polarisation linéaire",
+        "Test carbonatation et chlorures - causes corrosion",
+        "Évaluation perte section armatures par carottage"
+      ],
+      humidite: [
+        "Cartographie humidité - hygromètre, caméra thermique",
+        "Recherche infiltrations - test étanchéité, colorant traceur",
+        "Analyse causes : remontées capillaires, défaut étanchéité",
+        "Mesure teneur eau - méthode gravimétrique si nécessaire"
+      ],
+      deformation: [
+        "Relevé topographique - nivellement haute précision",
+        "Mesure flèches poutres/dalles - comparaison calculs théoriques",
+        "Monitoring déformations - inclinomètres, jauges",
+        "Investigation fondations si tassement différentiel"
+      ],
+      desagregation: [
+        "Prélèvements échantillons - analyses laboratoire",
+        "Identification causes : alcali-réaction, sulfates, gel-dégel",
+        "Test résistance mécanique résiduelle",
+        "Évaluation étendue dégradations"
+      ],
+      tassement: [
+        "Étude géotechnique approfondie - sondages sol",
+        "Nivellement précis - mesure amplitude tassements",
+        "Investigation fondations - auscultation, carottage",
+        "Analyse causes : nature sol, surcharges, sous-sol"
+      ],
+      autres: [
+        "Investigation spécifique selon nature désordres",
+        "Consultation bureau d'études spécialisé si nécessaire",
+        "Analyses laboratoire ciblées",
+        "Auscultation dynamique si pathologie évolutive"
+      ]
+    };
+
+    // Initialiser la webcam
+    async function setupBuildingWebcam() {
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) return;
+        buildingStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        buildingWebcam.srcObject = buildingStream;
+        await buildingWebcam.play();
+      } catch (error) {
+        console.warn('Accès webcam non disponible', error);
+      }
+    }
+
+    // Capturer depuis webcam
+    document.getElementById('captureBuilding').addEventListener('click', (e) => {
+      e.preventDefault();
+      buildingCanvas.width = buildingWebcam.videoWidth;
+      buildingCanvas.height = buildingWebcam.videoHeight;
+      buildingCtx.drawImage(buildingWebcam, 0, 0);
+      buildingImage.src = buildingCanvas.toDataURL('image/png');
+      buildingImage.style.display = 'block';
+      buildingWebcam.style.display = 'none';
+    });
+
+    // Upload fichier
+    document.getElementById('uploadBuildingBtn').addEventListener('click', () => {
+      document.getElementById('buildingFileInput').click();
+    });
+
+    document.getElementById('buildingUpload').addEventListener('click', () => {
+      document.getElementById('buildingFileInput').click();
+    });
+
+    document.getElementById('buildingFileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file || !file.type.startsWith('image/')) {
+        alert('Veuillez sélectionner une image valide');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        buildingImage.src = ev.target.result;
+        buildingImage.style.display = 'block';
+        buildingWebcam.style.display = 'none';
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Drag & Drop
+    document.getElementById('buildingUpload').addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.target.classList.add('dragover');
+    });
+
+    document.getElementById('buildingUpload').addEventListener('dragleave', (e) => {
+      e.target.classList.remove('dragover');
+    });
+
+    document.getElementById('buildingUpload').addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.target.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          buildingImage.src = ev.target.result;
+          buildingImage.style.display = 'block';
+          buildingWebcam.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // Submit formulaire
+    buildingForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      
+      // Récupérer les valeurs
+      const buildingType = document.getElementById('buildingType');
+      const structureType = document.getElementById('structureType');
+      const year = document.getElementById('year').value;
+      const location = document.getElementById('location').value;
+      
+      // Afficher les résultats basiques
+      document.getElementById('resultBuildingType').textContent = buildingType.options[buildingType.selectedIndex].text;
+      document.getElementById('resultStructure').textContent = structureType.options[structureType.selectedIndex].text;
+      document.getElementById('resultYear').textContent = year;
+      document.getElementById('resultLocation').textContent = location;
+      
+      // Générer liste matériel selon structure
+      const equipment = equipmentByStructure[structureType.value] || [];
+      const equipmentList = document.getElementById('equipmentList');
+      equipmentList.innerHTML = '<ul>' + 
+        equipment.map(item => `<li>${item}</li>`).join('') +
+        '</ul>';
+      
+      // Générer préconisations selon désordres cochés
+      const checkedIssues = Array.from(document.querySelectorAll('.issue-checkbox:checked')).map(cb => cb.value);
+      const recommendations = [];
+      
+      checkedIssues.forEach(issue => {
+        if (investigationsByIssue[issue]) {
+          recommendations.push(...investigationsByIssue[issue]);
+        }
+      });
+      
+      // Préconisations générales si aucun désordre coché
+      if (recommendations.length === 0) {
+        recommendations.push(
+          "Inspection visuelle détaillée de l'ensemble de la structure",
+          "Relevé photographique complet",
+          "Vérification conformité aux plans d'exécution",
+          "Contrôles non destructifs selon normes en vigueur"
+        );
+      }
+      
+      const recommendationsList = document.getElementById('recommendationsList');
+      recommendationsList.innerHTML = '<ul>' + 
+        recommendations.map(item => `<li>${item}</li>`).join('') +
+        '</ul>';
+      
+      // Afficher résultat
+      buildingResult.style.display = 'block';
+      buildingResult.classList.add('show');
+      
+      // Scroll vers résultat
+      setTimeout(() => {
+        window.scrollTo({
+          top: buildingResult.offsetTop - 100,
+          behavior: 'smooth'
+        });
+      }, 100);
+    });
+
+    // Initialiser
+    setupBuildingWebcam();
+  </script>
+</body>
+</html>

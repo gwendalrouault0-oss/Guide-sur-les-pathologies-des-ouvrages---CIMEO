@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CIMEO Normandie - Diagnostic de structures par IA</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <!-- Header -->
+  <div class="header">
+    <a href="index.html" class="logo-link">
+      <div class="logo">
+        <img src="assets/logo_cimeo_normandie.png" alt="CIMEO Normandie" class="logo-image">
+        <div>
+          <div class="company-name">CIMEO Normandie</div>
+          <div class="company-tagline">Diagnostic de structures par IA</div>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <!-- Main Container -->
+  <div class="container">
+    <div class="main-card">
+      <h2 class="section-title">Bienvenue sur la plateforme de diagnostic</h2>
+      <p class="intro-text">Plateforme professionnelle d'analyse structurelle assistée par Intelligence Artificielle</p>
+      
+      <div class="home-grid">
+        <!-- Card 1: Analyse des pathologies -->
+        <div class="home-card">
+          <div class="card-icon">🔍</div>
+          <h3>Analyse des pathologies</h3>
+          <p>Détection et classification des désordres structurels : fissuration, éclatement, corrosion des armatures selon les normes du génie civil</p>
+          <div class="card-features">
+            <span class="feature-tag">✓ Analyse IA</span>
+            <span class="feature-tag">✓ Rapport PDF</span>
+            <span class="feature-tag">✓ Normes DTU</span>
+          </div>
+          <a href="desordres.html" class="btn btn-primary">Commencer l'analyse</a>
+        </div>
+
+        <!-- Card 2: Analyse de bâtiment -->
+        <div class="home-card">
+          <div class="card-icon">🏢</div>
+          <h3>Diagnostic de bâtiment</h3>
+          <p>Évaluation complète de l'ouvrage avec recommandations techniques et matériel d'inspection adapté au type de structure</p>
+          <div class="card-features">
+            <span class="feature-tag">✓ Fiche technique</span>
+            <span class="feature-tag">✓ Matériel requis</span>
+            <span class="feature-tag">✓ Préconisations</span>
+          </div>
+          <a href="batiment.html" class="btn btn-secondary">Analyser un bâtiment</a>
+        </div>
+      </div>
+
+      <!-- Info Section -->
+      <div class="info-section">
+        <h3>Outil professionnel pour ingénieurs structures</h3>
+        <p>Cette plateforme a été conçue pour assister les ingénieurs en génie civil dans leurs missions de diagnostic structurel. Elle intègre les connaissances techniques des normes françaises et européennes en matière d'inspection d'ouvrages.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>© 2024 CIMEO Normandie - Gwendal ROUAULT</p>
+    <p class="footer-subtitle">Diagnostic de structures par Intelligence Artificielle</p>
+  </div>
+</body>
+</html>

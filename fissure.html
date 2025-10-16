@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CIMEO Normandie - Analyse de fissures par IA</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <!-- Header -->
+  <div class="header">
+    <a href="index.html" class="logo-link">
+      <div class="logo">
+        <img src="assets/logo_cimeo_normandie.png" alt="CIMEO Normandie" class="logo-image">
+        <div>
+          <div class="company-name">CIMEO Normandie</div>
+          <div class="company-tagline">Diagnostic de structures par IA</div>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <!-- Main Container -->
+  <div class="container">
+    <div class="main-card">
+      <h2 class="section-title">Détection de fissuration par IA</h2>
+      <p class="intro-text">Analysez automatiquement la présence de fissures sur vos structures grâce à l'Intelligence Artificielle</p>
+
+      <!-- Section d'analyse -->
+      <div class="ai-analysis-section">
+        
+        <!-- Étape 1: Capture/Upload Image -->
+        <fieldset class="form-section">
+          <legend>📷 Capture de l'image</legend>
+          
+          <video id="fissureWebcam" class="media-element" autoplay playsinline muted></video>
+          <canvas id="fissureCanvas" style="display:none;"></canvas>
+          <img id="fissureImage" class="media-element uploaded-image" alt="Photo à analyser" style="display:none;">
+
+          <div class="upload-area" id="fissureUpload">
+            <div class="upload-icon">📁</div>
+            <p>Glissez-déposez une image ou <strong>cliquez</strong> pour télécharger</p>
+            <span class="upload-hint">L'IA analysera automatiquement la présence de fissures</span>
+          </div>
+
+          <div class="controls">
+            <button type="button" id="captureBtn" class="btn btn-primary">
+              📸 Capturer avec caméra
+            </button>
+            <button type="button" id="uploadBtn" class="btn btn-secondary">
+              📤 Télécharger une image
+            </button>
+            <input type="file" id="fileInput" accept="image/*" style="display:none;">
+          </div>
+        </fieldset>
+
+        <!-- Étape 2: Informations complémentaires (optionnel) -->
+        <fieldset class="form-section">
+          <legend>🏗️ Informations complémentaires (optionnel)</legend>
+          
+          <div class="form-group">
+            <label for="materialType">Type de matériau</label>
+            <select id="materialType" name="materialType">
+              <option value="">-- Optionnel --</option>
+              <option value="beton">Béton armé / précontraint</option>
+              <option value="acier">Acier / Métallique</option>
+              <option value="bois">Bois / Charpente</option>
+              <option value="maconnerie">Maçonnerie</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="location">Localisation</label>
+            <input type="text" id="location" name="location" placeholder="Ex: Poutre principale, Mur porteur...">
+          </div>
+
+          <div class="form-group">
+            <label for="notes">Remarques</label>
+            <textarea id="notes" name="notes" placeholder="Observations complémentaires..." rows="3"></textarea>
+          </div>
+        </fieldset>
+
+        <!-- Bouton d'analyse -->
+        <div class="analysis-action">
+          <button type="button" id="analyzeBtn" class="btn btn-primary btn-large" disabled>
+            🤖 Lancer l'analyse IA
+          </button>
+          <p class="analysis-hint">Capturez ou téléchargez une image pour activer l'analyse</p>
+        </div>
+
+        <!-- Loading -->
+        <div id="loadingSection" class="loading-section" style="display:none;">
+          <div class="loading-spinner"></div>
+          <p>Analyse en cours par Intelligence Artificielle...</p>
+          <p class="loading-detail">Détection des fissures, classification, mesure d'ouverture...</p>
+        </div>
+
+        <!-- Résultats -->
+        <div id="resultSection" class="result-section" style="display:none;">
+          
+          <!-- Aucune fissure détectée -->
+          <div id="noFissureResult" style="display:none;">
+            <div class="result-icon no-detection">❌</div>
+            <h3>Aucune fissure détectée</h3>
+            <p>L'analyse par IA n'a pas détecté de fissuration significative sur cette image.</p>
+            <div class="result-note">
+              <strong>Recommandations :</strong>
+              <ul>
+                <li>Vérifiez la qualité et la résolution de l'image</li>
+                <li>Assurez-vous que la zone à analyser est bien visible</li>
+                <li>Réessayez avec un autre angle de vue si nécessaire</li>
+              </ul>
+            </div>
+            <button type="button" id="retryBtn" class="btn btn-outline" style="margin-top: 20px;">
+              🔄 Analyser une autre image
+            </button>
+          </div>
+
+          <!-- Fissure détectée -->
+          <div id="fissureResult" style="display:none;">
+            <div class="result-icon detection-success">✅</div>
+            <h3>Fissure détectée</h3>
+            <p>L'Intelligence Artificielle a identifié une fissuration sur la structure analysée.</p>
+            
+            <!-- Résultats de l'analyse IA -->
+            <div class="ai-results">
+              <h4>📊 Résultats de l'analyse IA</h4>
+              <div class="ai-metrics">
+                <div class="metric-card">
+                  <div class="metric-label">Confiance de détection</div>
+                  <div class="metric-value" id="confidence">--</div>
+                </div>
+                <div class="metric-card">
+                  <div class="metric-label">Type estimé</div>
+                  <div class="metric-value" id="fissureType">--</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Informations complémentaires si renseignées -->
+            <div id="additionalInfo" class="additional-info" style="display:none;">
+              <h4>📝 Informations complémentaires</h4>
+              <p><strong>Matériau :</strong> <span id="resultMaterial"></span></p>
+              <p><strong>Localisation :</strong> <span id="resultLocation"></span></p>
+              <p><strong>Remarques :</strong> <span id="resultNotes"></span></p>
+            </div>
+
+            <!-- Lien vers le PDF -->
+            <div class="pdf-download-section">
+              <h4>📄 Guide technique de diagnostic</h4>
+              <p>Pour une analyse détaillée et les recommandations d'intervention, consultez le guide complet :</p>
+              <a href="https://gwendalrouault0-oss.github.io/Guide-sur-les-pathologies-des-ouvrages---CIMEO/pdf/Fissuration.pdf" 
+                 target="_blank" 
+                 class="btn btn-primary btn-large" 
+                 style="margin-top: 15px;">
+                📥 Télécharger le Guide de diagnostic des fissures (PDF)
+              </a>
+            </div>
+
+            <div class="result-actions">
+              <button type="button" id="newAnalysisBtn" class="btn btn-outline">
+                🔄 Nouvelle analyse
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Retour -->
+      <div class="action-footer">
+        <a href="desordres.html" class="btn btn-outline">← Retour aux désordres</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>© 2024 CIMEO Normandie - Gwendal ROUAULT</p>
+    <p class="footer-subtitle">Diagnostic de structures par Intelligence Artificielle</p>
+  </div>
+
+  <!-- Scripts -->
+  <script>
+    const webcam = document.getElementById('fissureWebcam');
+    const canvas = document.getElementById('fissureCanvas');
+    const ctx = canvas.getContext('2d');
+    const imageElement = document.getElementById('fissureImage');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const loadingSection = document.getElementById('loadingSection');
+    const resultSection = document.getElementById('resultSection');
+    let stream = null;
+    let currentImageData = null;
+
+    // Initialiser la webcam
+    async function setupWebcam() {
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) return;
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          } 
+        });
+        webcam.srcObject = stream;
+        await webcam.play();
+      } catch (error) {
+        console.warn('Accès webcam non disponible', error);
+      }
+    }
+
+    // Capturer depuis webcam
+    document.getElementById('captureBtn').addEventListener('click', () => {
+      canvas.width = webcam.videoWidth;
+      canvas.height = webcam.videoHeight;
+      ctx.drawImage(webcam, 0, 0);
+      const imageData = canvas.toDataURL('image/jpeg', 0.95);
+      imageElement.src = imageData;
+      currentImageData = imageData;
+      imageElement.style.display = 'block';
+      webcam.style.display = 'none';
+      analyzeBtn.disabled = false;
+    });
+
+    // Upload fichier
+    document.getElementById('uploadBtn').addEventListener('click', () => {
+      document.getElementById('fileInput').click();
+    });
+
+    document.getElementById('fissureUpload').addEventListener('click', () => {
+      document.getElementById('fileInput').click();
+    });
+
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file || !file.type.startsWith('image/')) {
+        alert('Veuillez sélectionner une image valide');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        imageElement.src = ev.target.result;
+        currentImageData = ev.target.result;
+        imageElement.style.display = 'block';
+        webcam.style.display = 'none';
+        analyzeBtn.disabled = false;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Drag & Drop
+    const uploadArea = document.getElementById('fissureUpload');
+    uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+      uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          imageElement.src = ev.target.result;
+          currentImageData = ev.target.result;
+          imageElement.style.display = 'block';
+          webcam.style.display = 'none';
+          analyzeBtn.disabled = false;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // Analyse IA
+    analyzeBtn.addEventListener('click', async () => {
+      if (!currentImageData) return;
+
+      // Afficher loading
+      loadingSection.style.display = 'block';
+      resultSection.style.display = 'none';
+      
+      // Scroll vers loading
+      setTimeout(() => {
+        loadingSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+
+      // Simulation de l'analyse IA (remplacer par vraie API)
+      // ICI TU INTÉGRERAS TON MODÈLE IA
+      setTimeout(() => {
+        performAIAnalysis();
+      }, 3000);
+    });
+
+    // Fonction d'analyse IA (à remplacer par ton vrai modèle)
+    function performAIAnalysis() {
+      // SIMULATION - Remplace cette partie par ton API/modèle IA réel
+      const fissureDetected = Math.random() > 0.3; // 70% de chance de détecter
+      
+      loadingSection.style.display = 'none';
+      resultSection.style.display = 'block';
+      resultSection.classList.add('show');
+
+      if (fissureDetected) {
+        // Fissure détectée
+        document.getElementById('noFissureResult').style.display = 'none';
+        document.getElementById('fissureResult').style.display = 'block';
+
+        // Résultats simulés (remplacer par vrais résultats IA)
+        document.getElementById('confidence').textContent = (85 + Math.random() * 14).toFixed(1) + '%';
+        
+        const types = ['Fissure fine', 'Fissure moyenne', 'Fissure large', 'Microfissure'];
+        document.getElementById('fissureType').textContent = types[Math.floor(Math.random() * types.length)];
+        
+        document.getElementById('openingWidth').textContent = (0.1 + Math.random() * 3).toFixed(2) + ' mm';
+        
+        const severities = [
+          { text: 'Faible', color: '#10b981' },
+          { text: 'Modérée', color: '#f59e0b' },
+          { text: 'Élevée', color: '#ef4444' }
+        ];
+        const severity = severities[Math.floor(Math.random() * severities.length)];
+        const severityEl = document.getElementById('severity');
+        severityEl.textContent = severity.text;
+        severityEl.style.color = severity.color;
+
+        // Infos complémentaires si renseignées
+        const material = document.getElementById('materialType').value;
+        const location = document.getElementById('location').value;
+        const notes = document.getElementById('notes').value;
+
+        if (material || location || notes) {
+          document.getElementById('additionalInfo').style.display = 'block';
+          document.getElementById('resultMaterial').textContent = material ? 
+            document.querySelector(`#materialType option[value="${material}"]`).textContent : 'Non renseigné';
+          document.getElementById('resultLocation').textContent = location || 'Non renseigné';
+          document.getElementById('resultNotes').textContent = notes || 'Aucune';
+        }
+
+      } else {
+        // Aucune fissure
+        document.getElementById('noFissureResult').style.display = 'block';
+        document.getElementById('fissureResult').style.display = 'none';
+      }
+
+      // Scroll vers résultat
+      setTimeout(() => {
+        resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+
+    // Boutons de réinitialisation
+    function resetAnalysis() {
+      currentImageData = null;
+      imageElement.style.display = 'none';
+      webcam.style.display = 'block';
+      resultSection.style.display = 'none';
+      loadingSection.style.display = 'none';
+      analyzeBtn.disabled = true;
+      document.getElementById('materialType').value = '';
+      document.getElementById('location').value = '';
+      document.getElementById('notes').value = '';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    document.getElementById('retryBtn')?.addEventListener('click', resetAnalysis);
+    document.getElementById('newAnalysisBtn')?.addEventListener('click', resetAnalysis);
+
+    // Initialiser
+    setupWebcam();
+  </script>
+</body>
+</html>
