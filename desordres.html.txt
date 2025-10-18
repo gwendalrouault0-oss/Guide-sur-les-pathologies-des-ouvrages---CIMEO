@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CIMEO Normandie - Analyse de désordres</title>
   <link rel="stylesheet" href="assets/style.css">
+  <script src="assets/footer.js"></script>
 </head>
 <body>
   <!-- Header -->
@@ -83,10 +84,6 @@
     </div>
   </div>
 
-  <!-- Footer -->
-  <div class="footer">
-    <p>© 2024 CIMEO Normandie - Gwendal ROUAULT</p>
-    <p class="footer-subtitle">Diagnostic de structures par Intelligence Artificielle</p>
-  </div>
+  <!-- Le footer sera automatiquement ajouté par footer.js -->
 </body>
 </html>

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CIMEO Normandie - Analyse de fissures par IA</title>
   <link rel="stylesheet" href="assets/style.css">
+  <script src="assets/footer.js"></script>
 </head>
 <body>
   <!-- Header -->
@@ -56,7 +57,7 @@
 
         <!-- Étape 2: Informations complémentaires (optionnel) -->
         <fieldset class="form-section">
-          <legend>🏗️ Informations complémentaires (optionnel)</legend>
+          <legend>🗂️ Informations complémentaires (optionnel)</legend>
           
           <div class="form-group">
             <label for="materialType">Type de matériau</label>
@@ -139,7 +140,7 @@
 
             <!-- Informations complémentaires si renseignées -->
             <div id="additionalInfo" class="additional-info" style="display:none;">
-              <h4>📝 Informations complémentaires</h4>
+              <h4>🔍 Informations complémentaires</h4>
               <p><strong>Matériau :</strong> <span id="resultMaterial"></span></p>
               <p><strong>Localisation :</strong> <span id="resultLocation"></span></p>
               <p><strong>Remarques :</strong> <span id="resultNotes"></span></p>
@@ -172,12 +173,6 @@
         <a href="desordres.html" class="btn btn-outline">← Retour aux désordres</a>
       </div>
     </div>
-  </div>
-
-  <!-- Footer -->
-  <div class="footer">
-    <p>© 2024 CIMEO Normandie - Gwendal ROUAULT</p>
-    <p class="footer-subtitle">Diagnostic de structures par Intelligence Artificielle</p>
   </div>
 
   <!-- Scripts -->
@@ -315,18 +310,6 @@
         
         const types = ['Fissure fine', 'Fissure moyenne', 'Fissure large', 'Microfissure'];
         document.getElementById('fissureType').textContent = types[Math.floor(Math.random() * types.length)];
-        
-        document.getElementById('openingWidth').textContent = (0.1 + Math.random() * 3).toFixed(2) + ' mm';
-        
-        const severities = [
-          { text: 'Faible', color: '#10b981' },
-          { text: 'Modérée', color: '#f59e0b' },
-          { text: 'Élevée', color: '#ef4444' }
-        ];
-        const severity = severities[Math.floor(Math.random() * severities.length)];
-        const severityEl = document.getElementById('severity');
-        severityEl.textContent = severity.text;
-        severityEl.style.color = severity.color;
 
         // Infos complémentaires si renseignées
         const material = document.getElementById('materialType').value;
@@ -373,5 +356,7 @@
     // Initialiser
     setupWebcam();
   </script>
+
+  <!-- Le footer sera automatiquement ajouté par footer.js -->
 </body>
 </html>

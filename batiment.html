@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CIMEO Normandie - Diagnostic de bâtiment</title>
   <link rel="stylesheet" href="assets/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="assets/footer.js"></script>
 </head>
 <body>
   <!-- Header -->
@@ -24,7 +26,7 @@
   <div class="container">
     <div class="main-card">
       <h2 class="section-title">Diagnostic de bâtiment</h2>
-      <p class="intro-text">Évaluation complète de l'ouvrage avec recommandations techniques et matériel d'inspection adapté</p>
+      <p class="intro-text">Évaluation complète de l'ouvrage avec génération automatique des documents techniques</p>
 
       <!-- Formulaire bâtiment -->
       <form id="batimentForm" class="building-form">
@@ -47,16 +49,24 @@
             <button type="button" id="captureBuilding" class="btn btn-primary">
               📸 Capturer avec caméra
             </button>
+            <button type="button" id="switchBuildingCamera" class="btn btn-secondary" disabled>
+              🔄 Changer caméra
+            </button>
             <button type="button" id="uploadBuildingBtn" class="btn btn-secondary">
               📤 Télécharger une image
             </button>
             <input type="file" id="buildingFileInput" accept="image/*" style="display:none;">
           </div>
+          
+          <!-- Indicateur de caméra active -->
+          <div id="buildingCameraInfo" class="camera-info" style="display:none;">
+            <span id="buildingCameraLabel">Caméra : -</span>
+          </div>
         </fieldset>
 
         <!-- Section Type de bâtiment -->
         <fieldset class="form-section">
-          <legend>🏗️ Type de structure</legend>
+          <legend>🗏️ Type de structure</legend>
           
           <div class="form-group">
             <label for="buildingType">Type d'ouvrage</label>
@@ -173,7 +183,7 @@
       <div id="buildingResult" class="result-section">
         <div class="result-icon">✅</div>
         <h3>Diagnostic du bâtiment généré</h3>
-        <p>Analyse complète des caractéristiques et préconisations d'inspection</p>
+        <p>Sélectionnez le matériel d'inspection requis et générez les documents</p>
         
         <div class="result-details">
           <p><strong>Type d'ouvrage :</strong> <span id="resultBuildingType"></span></p>
@@ -182,16 +192,21 @@
           <p><strong>Localisation :</strong> <span id="resultLocation"></span></p>
         </div>
 
-        <!-- Matériel requis dynamique -->
+        <!-- Matériel requis avec checklist -->
         <div id="equipmentSection" class="equipment-section">
-          <h4>🔧 Matériel d'inspection requis</h4>
-          <div id="equipmentList" class="equipment-list"></div>
+          <h4>🔧 Matériel d'inspection - Sélection technicien</h4>
+          <p class="equipment-intro">Cochez le matériel nécessaire pour cette mission :</p>
+          <div id="equipmentChecklist" class="equipment-checklist-complete"></div>
         </div>
 
-        <!-- Préconisations -->
-        <div id="recommendationsSection" class="recommendations-section">
-          <h4>📝 Préconisations d'investigation</h4>
-          <div id="recommendationsList" class="recommendations-list"></div>
+        <!-- Actions de génération -->
+        <div class="download-actions">
+          <button type="button" id="generatePDF" class="btn btn-primary" disabled>
+            📄 Générer PDF Technicien
+          </button>
+          <button type="button" id="generateDevis" class="btn btn-secondary" disabled>
+            📝 Générer Devis Word
+          </button>
         </div>
       </div>
     </div>
@@ -211,155 +226,272 @@
     const buildingImage = document.getElementById('buildingImage');
     const buildingForm = document.getElementById('batimentForm');
     const buildingResult = document.getElementById('buildingResult');
+    const switchBuildingCamera = document.getElementById('switchBuildingCamera');
+    const buildingCameraInfo = document.getElementById('buildingCameraInfo');
+    const buildingCameraLabel = document.getElementById('buildingCameraLabel');
+    
     let buildingStream = null;
+    let availableBuildingCameras = [];
+    let currentBuildingCameraIndex = 0;
+    let capturedImageData = null;
 
-    // Matériel par type de structure
-    const equipmentByStructure = {
-      beton_arme: [
-        "Pachomètre (détecteur d'armatures) - localisation, enrobage, diamètre",
-        "Scléromètre (marteau de Schmidt) - résistance superficielle béton",
-        "Auscultation sonique/ultrasonique - détection vides, défauts internes",
-        "Carottage béton - prélèvement échantillons laboratoire",
+    // Liste complète du matériel basée sur les documents fournis
+    const completeEquipmentList = {
+      // Sondage destructifs
+      sondage_destructifs: [
+        "Carotteuse",
+        "Échafaudage / Échelle télescopique / PEIRL / Escabeau", 
+        "Piquer sur batterie / Piquer 5kg",
+        "Piquer 10kg",
+        "Pied de biche / Barre à mine",
+        "Scie sabre / Scie sauteuse / Scie à placo",
+        "Meuleuse",
+        "Pelle / Pioche"
+      ],
+      
+      // Sondage non destructif
+      sondage_non_destructifs: [
+        "Radar GSSI (+ canne)",
+        "Ferroscan",
+        "Humidimètre", 
+        "Ultrasons",
+        "Piccolo / Elcomètre / Zonotip",
+        "Endoscope",
+        "Scléromètre",
+        "Corrosimètre",
+        "BLK360",
+        "Pachomètre (détecteur d'armatures)"
+      ],
+      
+      // Électricité
+      electricite: [
+        "Rallonges électriques",
+        "Groupe électrogène",
+        "Essence",
+        "Éclairage (projecteurs)"
+      ],
+      
+      // Protection / Nettoyage
+      protection_nettoyage: [
+        "Aspirateur et balai",
+        "Polyane / Zipwall", 
+        "Masque / Gants",
+        "Sacs à gravats"
+      ],
+      
+      // Matériel de rebouchage
+      rebouchage: [
+        "Truelle / Taloche",
+        "Gamate",
+        "Bidon d'eau",
+        "Mortier",
+        "Béton"
+      ],
+      
+      // Location matériel
+      location: [
+        "Nacelle",
+        "Carotteuse (location)",
+        "Carrosimètre", 
+        "Matériel spécialisé selon besoin"
+      ],
+      
+      // Matériel complémentaire par type de structure
+      complementaire: [
+        "Caméra thermique - détection défauts, humidité",
         "Fissuromètre digital 0.05-5mm - mesure ouverture fissures",
         "pH-mètre / Test carbonatation - profondeur carbonatation",
         "Potentiel d'électrode - corrosion armatures",
-        "Caméra thermique - détection défauts, humidité"
-      ],
-      beton_precontraint: [
-        "Pachomètre haute précision - détection câbles précontrainte",
         "Gammagraphie - localisation exacte armatures/câbles",
-        "Contrôle ultrasonique avancé - intégrité béton, injection gaines",
-        "Mesure force précontrainte résiduelle - vérin creux",
-        "Endoscopie - inspection gaines injection",
-        "Carottage orienté - vérification injection, qualité béton",
         "Géoradar - cartographie armatures 3D",
-        "Fissuromètre électronique - monitoring continu"
-      ],
-      charpente_metallique: [
-        "Contrôle dimensionnel - pied à coulisse, palmer",
-        "Contrôle ultrasonique - épaisseur, défauts internes",
         "Magnétoscopie - détection fissures surface/sous-surface",
         "Ressuage (liquide pénétrant) - fissures débouchantes",
-        "Mesure épaisseur peinture - jauge revêtement",
-        "Détecteur corrosion - mesure perte épaisseur",
-        "Contrôle boulonnerie - clé dynamométrique",
-        "Inspection soudures - loupe, endoscope"
-      ],
-      charpente_bois: [
         "Hygromètre à pointes - taux d'humidité bois",
         "Résistographe - densité bois, détection altérations",
-        "Endoscope - inspection cavités, zones inaccessibles",
         "Marteau de sondage - détection zones altérées",
         "Pénétromètre bois - dureté superficielle",
         "Détecteur insectes xylophages - inspection parasites",
-        "Caméra thermique - détection humidité, défauts",
-        "Jauge contrainte mécanique - déformations, flèches"
-      ],
-      maconnerie_porteuse: [
-        "Endoscope rigide/souple - inspection joints, cavités",
-        "Carottage maçonnerie - prélèvement échantillons",
-        "Contrôle humidité - hygromètre maçonnerie",
+        "Jauge contrainte mécanique - déformations, flèches",
         "Marteau géologue - identification matériaux",
-        "Fissuromètre - suivi fissuration",
         "Nivellement laser - mesure déformations, tassements",
-        "Caméra thermique - ponts thermiques, humidité",
-        "Test compression in-situ - vérin plat"
-      ],
-      pierre: [
-        "Endoscope - inspection joints, cavités",
-        "Hygromètre pierre - taux humidité",
-        "Scléromètre pierre - dureté superficielle",
+        "Test compression in-situ - vérin plat",
         "Test perméabilité Karsten - absorption eau",
         "Loupe binoculaire x20 - analyse altérations",
+        "Colorimétrie - mesure altération chromatique"
+      ]
+    };
+
+    // Matériel par type de structure (basé sur la liste complète)
+    const equipmentByStructure = {
+      beton_arme: [
+        ...completeEquipmentList.sondage_non_destructifs.slice(0, 6),
+        ...completeEquipmentList.sondage_destructifs.slice(0, 4),
+        ...completeEquipmentList.electricite,
+        ...completeEquipmentList.protection_nettoyage,
+        ...completeEquipmentList.rebouchage,
+        "Caméra thermique - détection défauts, humidité",
+        "Fissuromètre digital 0.05-5mm - mesure ouverture fissures",
+        "pH-mètre / Test carbonatation - profondeur carbonatation",
+        "Potentiel d'électrode - corrosion armatures"
+      ],
+      
+      beton_precontraint: [
+        ...completeEquipmentList.sondage_non_destructifs,
+        ...completeEquipmentList.sondage_destructifs.slice(0, 3),
+        ...completeEquipmentList.electricite,
+        ...completeEquipmentList.protection_nettoyage,
+        ...completeEquipmentList.location.slice(0, 2),
+        "Gammagraphie - localisation exacte armatures/câbles",
+        "Géoradar - cartographie armatures 3D",
+        "Fissuromètre électronique - monitoring continu"
+      ],
+      
+      charpente_metallique: [
+        ...completeEquipmentList.sondage_non_destructifs.slice(3, 8),
+        ...completeEquipmentList.sondage_destructifs.slice(4, 7),
+        ...completeEquipmentList.electricite,
+        ...completeEquipmentList.protection_nettoyage,
+        "Magnétoscopie - détection fissures surface/sous-surface",
+        "Ressuage (liquide pénétrant) - fissures débouchantes",
+        "Contrôle dimensionnel - pied à coulisse, palmer",
+        "Mesure épaisseur peinture - jauge revêtement",
+        "Contrôle boulonnerie - clé dynamométrique"
+      ],
+      
+      charpente_bois: [
+        ...completeEquipmentList.sondage_non_destructifs.slice(2, 6),
+        ...completeEquipmentList.sondage_destructifs.slice(6, 8),
+        ...completeEquipmentList.electricite,
+        ...completeEquipmentList.protection_nettoyage,
+        "Hygromètre à pointes - taux d'humidité bois",
+        "Résistographe - densité bois, détection altérations",
+        "Marteau de sondage - détection zones altérées",
+        "Pénétromètre bois - dureté superficielle",
+        "Détecteur insectes xylophages - inspection parasites",
+        "Jauge contrainte mécanique - déformations, flèches"
+      ],
+      
+      maconnerie_porteuse: [
+        ...completeEquipmentList.sondage_non_destructifs.slice(0, 4),
+        ...completeEquipmentList.sondage_destructifs.slice(0, 4),
+        ...completeEquipmentList.electricite,
+        ...completeEquipmentList.protection_nettoyage,
+        ...completeEquipmentList.rebouchage,
+        "Marteau géologue - identification matériaux",
+        "Nivellement laser - mesure déformations, tassements",
+        "Test compression in-situ - vérin plat"
+      ],
+      
+      pierre: [
+        ...completeEquipmentList.sondage_non_destructifs.slice(2, 7),
+        ...completeEquipmentList.sondage_destructifs.slice(0, 2),
+        ...completeEquipmentList.electricite,
+        ...completeEquipmentList.protection_nettoyage,
+        "Test perméabilité Karsten - absorption eau",
+        "Loupe binoculaire x20 - analyse altérations", 
         "Colorimétrie - mesure altération chromatique",
-        "Carottage pierre - échantillons laboratoire",
         "Fissuromètre - monitoring fissuration"
       ],
+      
       mixte_beton_acier: [
-        "Pachomètre - détection armatures béton",
-        "Contrôle ultrasonique - béton et acier",
+        ...completeEquipmentList.sondage_non_destructifs.slice(0, 8),
+        ...completeEquipmentList.sondage_destructifs.slice(0, 6),
+        ...completeEquipmentList.electricite,
+        ...completeEquipmentList.protection_nettoyage,
+        ...completeEquipmentList.rebouchage,
         "Magnétoscopie - fissures acier",
-        "Scléromètre - résistance béton",
-        "Mesure épaisseur - acier (ultrasons)",
-        "Fissuromètre - interface béton-acier",
         "Caméra thermique - défauts, délaminage",
         "Potentiel électrode - corrosion"
       ]
     };
 
-    // Préconisations selon désordres
-    const investigationsByIssue = {
-      fissures: [
-        "Pose de témoins fissuromètres pour suivi évolution",
-        "Caractérisation type fissuration (structurelle, retrait, thermique)",
-        "Investigation sur origines : fondations, surcharges, matériaux",
-        "Analyse orientation et distribution des fissures"
-      ],
-      eclats: [
-        "Sondage enrobage béton - mesure profondeur altération",
-        "Test carbonatation - détermination profondeur neutralisation",
-        "Analyse causes : corrosion, gel-dégel, alcali-réaction",
-        "Évaluation étendue et profondeur épaufrures"
-      ],
-      corrosion: [
-        "Mesure potentiel d'électrode - cartographie zones corrosion",
-        "Mesure vitesse corrosion - technique polarisation linéaire",
-        "Test carbonatation et chlorures - causes corrosion",
-        "Évaluation perte section armatures par carottage"
-      ],
-      humidite: [
-        "Cartographie humidité - hygromètre, caméra thermique",
-        "Recherche infiltrations - test étanchéité, colorant traceur",
-        "Analyse causes : remontées capillaires, défaut étanchéité",
-        "Mesure teneur eau - méthode gravimétrique si nécessaire"
-      ],
-      deformation: [
-        "Relevé topographique - nivellement haute précision",
-        "Mesure flèches poutres/dalles - comparaison calculs théoriques",
-        "Monitoring déformations - inclinomètres, jauges",
-        "Investigation fondations si tassement différentiel"
-      ],
-      desagregation: [
-        "Prélèvements échantillons - analyses laboratoire",
-        "Identification causes : alcali-réaction, sulfates, gel-dégel",
-        "Test résistance mécanique résiduelle",
-        "Évaluation étendue dégradations"
-      ],
-      tassement: [
-        "Étude géotechnique approfondie - sondages sol",
-        "Nivellement précis - mesure amplitude tassements",
-        "Investigation fondations - auscultation, carottage",
-        "Analyse causes : nature sol, surcharges, sous-sol"
-      ],
-      autres: [
-        "Investigation spécifique selon nature désordres",
-        "Consultation bureau d'études spécialisé si nécessaire",
-        "Analyses laboratoire ciblées",
-        "Auscultation dynamique si pathologie évolutive"
-      ]
-    };
-
-    // Initialiser la webcam
-    async function setupBuildingWebcam() {
+    // Énumérer les caméras disponibles pour le module bâtiment
+    async function getBuildingCameras() {
       try {
-        if (!navigator.mediaDevices?.getUserMedia) return;
-        buildingStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        buildingWebcam.srcObject = buildingStream;
-        await buildingWebcam.play();
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        availableBuildingCameras = devices.filter(device => device.kind === 'videoinput');
+        
+        if (availableBuildingCameras.length > 1) {
+          switchBuildingCamera.disabled = false;
+          switchBuildingCamera.title = `${availableBuildingCameras.length} caméras disponibles`;
+        } else {
+          switchBuildingCamera.disabled = true;
+          switchBuildingCamera.title = 'Une seule caméra disponible';
+        }
+        
+        return availableBuildingCameras;
       } catch (error) {
-        console.warn('Accès webcam non disponible', error);
+        console.warn('Impossible d\'énumérer les caméras', error);
+        switchBuildingCamera.disabled = true;
+        switchBuildingCamera.title = 'Erreur d\'accès aux caméras';
+        return [];
       }
     }
+
+    // Initialiser la webcam
+    async function setupBuildingWebcam(cameraIndex = 0) {
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) return;
+
+        if (buildingStream) {
+          buildingStream.getTracks().forEach(track => track.stop());
+        }
+
+        const cameras = await getBuildingCameras();
+        if (cameras.length === 0) return;
+
+        const constraints = {
+          video: {
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          }
+        };
+
+        if (cameras.length > 1 && cameras[cameraIndex]) {
+          constraints.video.deviceId = { exact: cameras[cameraIndex].deviceId };
+        }
+
+        buildingStream = await navigator.mediaDevices.getUserMedia(constraints);
+        buildingWebcam.srcObject = buildingStream;
+        await buildingWebcam.play();
+
+        if (cameras.length > 1) {
+          buildingCameraInfo.style.display = 'block';
+          const cameraName = cameras[cameraIndex]?.label || `Caméra ${cameraIndex + 1}`;
+          buildingCameraLabel.textContent = `Caméra : ${cameraName}`;
+        }
+
+      } catch (error) {
+        console.warn('Accès webcam non disponible', error);
+        if (cameraIndex !== 0) {
+          setupBuildingWebcam(0);
+        }
+      }
+    }
+
+    // Changer de caméra
+    switchBuildingCamera.addEventListener('click', async () => {
+      currentBuildingCameraIndex = (currentBuildingCameraIndex + 1) % availableBuildingCameras.length;
+      await setupBuildingWebcam(currentBuildingCameraIndex);
+    });
 
     // Capturer depuis webcam
     document.getElementById('captureBuilding').addEventListener('click', (e) => {
       e.preventDefault();
+      if (!buildingStream) {
+        alert('Caméra non disponible');
+        return;
+      }
+      
       buildingCanvas.width = buildingWebcam.videoWidth;
       buildingCanvas.height = buildingWebcam.videoHeight;
       buildingCtx.drawImage(buildingWebcam, 0, 0);
-      buildingImage.src = buildingCanvas.toDataURL('image/png');
+      const imageData = buildingCanvas.toDataURL('image/jpeg', 0.95);
+      buildingImage.src = imageData;
+      capturedImageData = imageData;
       buildingImage.style.display = 'block';
       buildingWebcam.style.display = 'none';
+      buildingCameraInfo.style.display = 'none';
     });
 
     // Upload fichier
@@ -380,8 +512,10 @@
       const reader = new FileReader();
       reader.onload = (ev) => {
         buildingImage.src = ev.target.result;
+        capturedImageData = ev.target.result;
         buildingImage.style.display = 'block';
         buildingWebcam.style.display = 'none';
+        buildingCameraInfo.style.display = 'none';
       };
       reader.readAsDataURL(file);
     });
@@ -404,18 +538,517 @@
         const reader = new FileReader();
         reader.onload = (ev) => {
           buildingImage.src = ev.target.result;
+          capturedImageData = ev.target.result;
           buildingImage.style.display = 'block';
           buildingWebcam.style.display = 'none';
+          buildingCameraInfo.style.display = 'none';
         };
         reader.readAsDataURL(file);
       }
     });
 
+    // Créer la checklist complète d'équipement sur le site
+    function createEquipmentChecklist() {
+      const checklist = document.getElementById('equipmentChecklist');
+      checklist.innerHTML = '';
+
+      // Liste complète du matériel organisée par catégories (identique au PDF)
+      const materielComplet = {
+        'SONDAGE DESTRUCTIF': [
+          'Carotteuse',
+          'Échafaudage / Échelle télescopique / PIRL / Escabeau',
+          'Piqueur sur batterie / Piqueur 5kg',
+          'Piqueur 10kg',
+          'Pied de biche / Barre à mine',
+          'Scie sabre / scie sauteuse / scie à placo',
+          'Meuleuse',
+          'Pelle / Pioche'
+        ],
+        'SONDAGE NON DESTRUCTIF': [
+          'Radar GSSI (+ canne)',
+          'Ferroscan',
+          'Humidimètre',
+          'Ultrasons',
+          'Piccolo / Élcomètre / Zonotip',
+          'Endoscope',
+          'Scléromètre',
+          'Corrosimètre',
+          'Pachomètre (détecteur d\'armatures)',
+          'BLK360'
+        ],
+        'ÉLECTRICITÉ / ÉNERGIE': [
+          'Rallonges électriques (nombre: ...)',
+          'Groupe électrogène',
+          'Essence',
+          'Éclairage / Projecteurs (nombre: ...)'
+        ],
+        'PROTECTION / NETTOYAGE': [
+          'Aspirateur et balai',
+          'Polyane / Zipwall',
+          'Masque / Gants',
+          'Sacs à gravats'
+        ],
+        'MATÉRIEL DE REBOUCHAGE': [
+          'Truelle / Taloche',
+          'Gamate',
+          'Bidon d\'eau',
+          'Mortier',
+          'Béton'
+        ],
+        'LOCATION MATÉRIEL': [
+          'Nacelle',
+          'Carotteuse (location)',
+          'Carrosimètre',
+          'Autres équipements spécialisés'
+        ],
+        'MATÉRIEL SPÉCIALISÉ BÉTON': [
+          'Caméra thermique',
+          'Fissuromètre digital 0.05-5mm',
+          'pH-mètre / Test carbonatation',
+          'Potentiel d\'électrode',
+          'Gammagraphie',
+          'Géoradar'
+        ],
+        'MATÉRIEL SPÉCIALISÉ MÉTAL': [
+          'Magnétoscopie',
+          'Ressuage (liquide pénétrant)',
+          'Contrôle dimensionnel',
+          'Mesure épaisseur peinture',
+          'Contrôle boulonnerie',
+          'Détecteur corrosion'
+        ],
+        'MATÉRIEL SPÉCIALISÉ BOIS': [
+          'Hygromètre à pointes',
+          'Résistographe',
+          'Marteau de sondage',
+          'Pénétromètre bois',
+          'Détecteur insectes xylophages',
+          'Jauge contrainte mécanique'
+        ],
+        'MATÉRIEL SPÉCIALISÉ MAÇONNERIE': [
+          'Marteau géologue',
+          'Nivellement laser',
+          'Test compression in-situ',
+          'Test perméabilité Karsten',
+          'Loupe binoculaire x20',
+          'Colorimétrie'
+        ]
+      };
+
+      // Créer l'interface par catégories
+      Object.entries(materielComplet).forEach(([category, items]) => {
+        // Titre de catégorie
+        const categoryDiv = document.createElement('div');
+        categoryDiv.className = 'equipment-category';
+        
+        const categoryTitle = document.createElement('h5');
+        categoryTitle.className = 'equipment-category-title';
+        categoryTitle.textContent = category;
+        categoryDiv.appendChild(categoryTitle);
+
+        // Container pour les items de cette catégorie
+        const itemsContainer = document.createElement('div');
+        itemsContainer.className = 'equipment-items-grid';
+
+        items.forEach((item, index) => {
+          const label = document.createElement('label');
+          label.className = 'equipment-checkbox-label';
+          
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.className = 'equipment-checkbox';
+          checkbox.id = `equipment-${category.replace(/\s+/g, '_')}-${index}`;
+          checkbox.value = item;
+          
+          const span = document.createElement('span');
+          span.textContent = item;
+          
+          label.appendChild(checkbox);
+          label.appendChild(span);
+          itemsContainer.appendChild(label);
+        });
+
+        categoryDiv.appendChild(itemsContainer);
+        checklist.appendChild(categoryDiv);
+      });
+
+      // Activer les boutons de génération
+      document.getElementById('generatePDF').disabled = false;
+      document.getElementById('generateDevis').disabled = false;
+    }
+
+    // Générer PDF Technicien
+    document.getElementById('generatePDF').addEventListener('click', () => {
+      const selectedEquipment = Array.from(document.querySelectorAll('.equipment-checkbox:checked'))
+        .map(cb => cb.value);
+      
+      if (selectedEquipment.length === 0) {
+        alert('Veuillez sélectionner au moins un équipement');
+        return;
+      }
+
+      generateTechnicianPDF(selectedEquipment);
+    });
+
+    function generateTechnicianPDF() {
+      // Récupérer seulement les équipements cochés
+      const selectedEquipment = Array.from(document.querySelectorAll('.equipment-checkbox:checked'))
+        .map(cb => cb.value);
+      
+      if (selectedEquipment.length === 0) {
+        alert('Veuillez sélectionner au moins un équipement');
+        return;
+      }
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      
+      // Couleurs COLZA/CIMEO
+      const colzaOrange = [255, 127, 39];
+      const colzaBlue = [0, 61, 126];
+      const cimeoRose = [231, 76, 154];
+      
+      // En-tête
+      doc.setFillColor(255, 255, 255);
+      doc.rect(0, 0, 210, 35, 'F');
+      
+      doc.setFillColor(...cimeoRose);
+      doc.circle(25, 17, 8, 'F');
+      
+      doc.setTextColor(...colzaBlue);
+      doc.setFontSize(20);
+      doc.setFont(undefined, 'bold');
+      doc.text('CIMEO', 37, 15);
+      
+      doc.setFontSize(16);
+      doc.setTextColor(...colzaOrange);
+      doc.text('NORMANDIE', 37, 22);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Diagnostic de structures par Intelligence Artificielle', 37, 27);
+      
+      doc.setLineWidth(2);
+      doc.setDrawColor(...colzaOrange);
+      doc.line(10, 35, 200, 35);
+      
+      // Titre principal
+      doc.setFillColor(240, 240, 240);
+      doc.rect(10, 40, 190, 12, 'F');
+      doc.setTextColor(...colzaBlue);
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text('FICHE MATÉRIEL CHANTIER', 15, 48);
+      
+      const date = new Date().toLocaleDateString('fr-FR');
+      const refNum = `CIM-${Date.now().toString().slice(-6)}`;
+      let yPos = 60;
+      
+      // Informations générales - Version compacte
+      doc.setFillColor(250, 250, 250);
+      doc.rect(10, yPos, 190, 8, 'F');
+      doc.setTextColor(...colzaBlue);
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text('INFORMATIONS GÉNÉRALES', 15, yPos + 6);
+      yPos += 15;
+      
+      doc.setFontSize(9);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont(undefined, 'normal');
+      
+      // Informations sur 3 lignes compactes
+      doc.text(`Réf: ${refNum}`, 15, yPos);
+      doc.text(`Date: ${date}`, 70, yPos);
+      doc.text(`Projet: ${document.getElementById('resultBuildingType').textContent}`, 120, yPos);
+      yPos += 6;
+      doc.text(`Localisation: ${document.getElementById('resultLocation').textContent}`, 15, yPos);
+      yPos += 6;
+      doc.text(`Structure: ${document.getElementById('resultStructure').textContent}`, 15, yPos);
+      doc.text(`Année: ${document.getElementById('resultYear').textContent}`, 120, yPos);
+      yPos += 15;
+      
+      // Liste du matériel sélectionné
+      doc.setFillColor(240, 240, 240);
+      doc.rect(10, yPos, 190, 12, 'F');
+      doc.setTextColor(...colzaBlue);
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text('MATÉRIEL SÉLECTIONNÉ POUR CETTE MISSION', 15, yPos + 8);
+      doc.setFontSize(10);
+      doc.text(`(${selectedEquipment.length} équipements sélectionnés)`, 15, yPos + 11);
+      yPos += 20;
+      
+      doc.setFontSize(9);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont(undefined, 'normal');
+      
+      // Afficher le matériel sélectionné en 2 colonnes
+      for (let i = 0; i < selectedEquipment.length; i += 2) {
+        if (yPos > 270) {
+          doc.addPage();
+          // En-tête page suivante
+          doc.setFillColor(...cimeoRose);
+          doc.circle(25, 17, 8, 'F');
+          doc.setTextColor(...colzaBlue);
+          doc.setFontSize(16);
+          doc.setFont(undefined, 'bold');
+          doc.text('CIMEO NORMANDIE', 37, 20);
+          doc.setLineWidth(1);
+          doc.setDrawColor(...colzaOrange);
+          doc.line(10, 25, 200, 25);
+          yPos = 35;
+          doc.setFontSize(9);
+          doc.setTextColor(0, 0, 0);
+          doc.setFont(undefined, 'normal');
+        }
+        
+        // Colonne 1
+        doc.setDrawColor(100, 100, 100);
+        doc.setLineWidth(0.3);
+        doc.rect(15, yPos - 2, 3, 3);
+        doc.text(`☐ ${selectedEquipment[i]}`, 22, yPos);
+        
+        // Colonne 2 (s'il y a un deuxième item)
+        if (selectedEquipment[i + 1]) {
+          doc.rect(105, yPos - 2, 3, 3);
+          doc.text(`☐ ${selectedEquipment[i + 1]}`, 112, yPos);
+        }
+        
+        yPos += 6;
+      }
+      
+      // Section notes en bas
+      if (yPos > 240) {
+        doc.addPage();
+        yPos = 30;
+      } else {
+        yPos += 10;
+      }
+      
+      doc.setFillColor(250, 250, 250);
+      doc.rect(10, yPos, 190, 8, 'F');
+      doc.setTextColor(...colzaBlue);
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text('NOTES / OBSERVATIONS', 15, yPos + 6);
+      yPos += 15;
+      
+      // Zone de notes
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.5);
+      doc.rect(15, yPos, 170, 20);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text('Zone libre pour notes de terrain...', 17, yPos + 5);
+      
+      // Pied de page sur toutes les pages
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(7);
+        doc.setTextColor(150, 150, 150);
+        doc.text('CIMEO Normandie - 2, impasse des renards LOT A2 – 76190 SAINTE MARIE DES CHAMPS', 15, 285);
+        doc.text(`contact76@cimeo.fr`, 15, 290);
+        doc.text(`Page ${i} sur ${pageCount}`, 170, 285);
+      }
+      
+      // Télécharger
+      const filename = `CIMEO_Fiche_Materiel_${refNum}.pdf`;
+      doc.save(filename);
+    }
+
+    // Générer Devis Word
+    document.getElementById('generateDevis').addEventListener('click', () => {
+      const selectedEquipment = Array.from(document.querySelectorAll('.equipment-checkbox:checked'))
+        .map(cb => cb.value);
+      
+      if (selectedEquipment.length === 0) {
+        alert('Veuillez sélectionner au moins un équipement');
+        return;
+      }
+
+      generateDevisDocument(selectedEquipment);
+    });
+
+    function generateDevisDocument(equipment) {
+      const buildingType = document.getElementById('resultBuildingType').textContent;
+      const structure = document.getElementById('resultStructure').textContent;
+      const year = document.getElementById('resultYear').textContent;
+      const location = document.getElementById('resultLocation').textContent;
+      const date = new Date().toLocaleDateString('fr-FR');
+      const refNum = `CIM-${Date.now().toString().slice(-6)}`;
+      
+      // Récupérer les désordres cochés
+      const issues = Array.from(document.querySelectorAll('.issue-checkbox:checked'))
+        .map(cb => cb.nextElementSibling.textContent);
+      
+      // Créer le contenu HTML qui sera transformé en Word
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.4; }
+            .header { border-bottom: 3px solid #FF7F27; padding-bottom: 20px; margin-bottom: 30px; }
+            .company-name { font-size: 24px; font-weight: bold; color: #003D7E; margin: 0; }
+            .tagline { font-size: 14px; color: #666; margin: 5px 0; }
+            .title { font-size: 18px; font-weight: bold; text-align: center; margin: 30px 0; padding: 15px; background: #f5f5f5; border: 1px solid #ddd; }
+            .section { margin: 25px 0; }
+            .section-title { font-size: 14px; font-weight: bold; color: #FF7F27; margin-bottom: 10px; text-transform: uppercase; }
+            .info-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+            .info-table td { padding: 8px; border: 1px solid #ddd; }
+            .info-table .label { background: #f9f9f9; font-weight: bold; width: 30%; }
+            .equipment-list { margin: 15px 0; }
+            .equipment-item { margin: 5px 0; padding: 5px 0; border-bottom: 1px dotted #ccc; }
+            .contact-info { margin-top: 40px; font-size: 12px; color: #666; border-top: 1px solid #ddd; padding-top: 15px; }
+            ul { margin: 10px 0; padding-left: 25px; }
+            li { margin: 3px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="company-name">CIMEO NORMANDIE</div>
+            <div class="tagline">Diagnostic de structures par Intelligence Artificielle</div>
+            <div class="tagline">Gwendal ROUAULT - Ingénieur Diagnostic Structures</div>
+          </div>
+          
+          <div class="title">PROPOSITION TECHNIQUE & FINANCIÈRE<br>N/Réf : ${refNum} du ${date}</div>
+          
+          <div class="section">
+            <div class="section-title">Demandeur :</div>
+            <p>[À COMPLÉTER]<br>
+            [Adresse]<br>
+            [Code postal] [Ville]</p>
+          </div>
+          
+          <div class="section">
+            <div class="section-title">Objet de la prestation :</div>
+            <p>Mission de diagnostic structurel - ${buildingType}</p>
+          </div>
+          
+          <div class="section">
+            <div class="section-title">Caractéristiques de l'ouvrage :</div>
+            <table class="info-table">
+              <tr><td class="label">Type d'ouvrage</td><td>${buildingType}</td></tr>
+              <tr><td class="label">Structure principale</td><td>${structure}</td></tr>
+              <tr><td class="label">Année de construction</td><td>${year}</td></tr>
+              <tr><td class="label">Localisation</td><td>${location}</td></tr>
+              <tr><td class="label">Contexte environnemental</td><td>${document.getElementById('context').value || 'Non spécifié'}</td></tr>
+            </table>
+          </div>
+          
+          ${issues.length > 0 ? `
+          <div class="section">
+            <div class="section-title">Désordres observés :</div>
+            <ul>
+              ${issues.map(issue => `<li>${issue}</li>`).join('')}
+            </ul>
+          </div>
+          ` : `
+          <div class="section">
+            <div class="section-title">Type de mission :</div>
+            <p>Inspection préventive - Diagnostic structurel</p>
+          </div>
+          `}
+          
+          <div class="section">
+            <div class="section-title">Matériel d'inspection requis :</div>
+            <div class="equipment-list">
+              ${equipment.map((item, index) => `
+                <div class="equipment-item">${index + 1}. ${item}</div>
+              `).join('')}
+            </div>
+          </div>
+          
+          <div class="section">
+            <div class="section-title">Méthodologie :</div>
+            <p>Notre mission de diagnostic sera réalisée selon les méthodes de diagnostic consignées dans les cahiers interactifs de l'IFSTTAR et conformément aux normes en vigueur.</p>
+            
+            <p><strong>Les investigations comprendront :</strong></p>
+            <ul>
+              <li>Inspection visuelle détaillée de l'ensemble de la structure</li>
+              <li>Relevé photographique complet et géolocalisé</li>
+              <li>Contrôles non destructifs selon normes applicables</li>
+              <li>Rédaction d'un rapport technique détaillé avec recommandations</li>
+            </ul>
+          </div>
+          
+          <div class="section">
+            <div class="section-title">Éléments de mission :</div>
+            <table class="info-table">
+              <tr><td class="label">Mission DIA</td><td>Études de Diagnostic - [PRIX À COMPLÉTER] € HT</td></tr>
+              <tr><td class="label">Mission APD</td><td>Études d'avant-projet définitif - [PRIX À COMPLÉTER] € HT</td></tr>
+              <tr><td class="label">Mission PRO</td><td>Études de projet - [PRIX À COMPLÉTER] € HT</td></tr>
+              <tr><td class="label">Mission ACT</td><td>Assistance passation contrats - [PRIX À COMPLÉTER] € HT</td></tr>
+            </table>
+          </div>
+          
+          <div class="section">
+            <div class="section-title">Conditions particulières :</div>
+            <ul>
+              <li>Accès aux zones d'études à garantir par le client</li>
+              <li>Prise de rendez-vous avec occupants assurée par le client</li>
+              <li>Remise du rapport sous 3 semaines après investigations</li>
+              <li>Mission conforme aux recommandations STRRES</li>
+              <li>Respect des normes NF et Eurocodes applicables</li>
+            </ul>
+          </div>
+          
+          <div class="section">
+            <div class="section-title">Documents joints :</div>
+            <ul>
+              <li>Photographie de l'ouvrage</li>
+              <li>Présente proposition technique</li>
+              <li>Conditions générales de vente</li>
+            </ul>
+          </div>
+          
+          <div class="section">
+            <div class="section-title">Délais d'intervention :</div>
+            <p>Intervention sur site : [À DÉFINIR] jours ouvrés après ordre de service<br>
+            Remise du rapport : 3 semaines après fin des investigations</p>
+          </div>
+          
+          <div style="margin-top: 50px;">
+            <p><strong>Pour accord,</strong></p>
+            <p>CIMEO Normandie<br>
+            Gwendal ROUAULT<br>
+            Ingénieur Diagnostic Structures</p>
+          </div>
+          
+          <div class="contact-info">
+            <strong>CIMEO NORMANDIE</strong><br>
+            2, impasse des renards LOT A2 – 76190 SAINTE MARIE DES CHAMPS<br>
+            Tél: [À COMPLÉTER] | Email: contact76@cimeo.fr<br>
+            N° Siret: [À COMPLÉTER]
+          </div>
+        </body>
+        </html>
+      `;
+      
+      // Créer un blob HTML et le télécharger comme fichier Word
+      const blob = new Blob([htmlContent], { 
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+      });
+      
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `CIMEO_Devis_${refNum}_${date.replace(/\//g, '-')}.doc`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      alert('Devis Word généré ! Ouvrez-le avec Microsoft Word pour finaliser la mise en forme et ajouter les prix.');
+    }
+
     // Submit formulaire
     buildingForm.addEventListener('submit', (e) => {
       e.preventDefault();
       
-      // Récupérer les valeurs
       const buildingType = document.getElementById('buildingType');
       const structureType = document.getElementById('structureType');
       const year = document.getElementById('year').value;
@@ -427,37 +1060,8 @@
       document.getElementById('resultYear').textContent = year;
       document.getElementById('resultLocation').textContent = location;
       
-      // Générer liste matériel selon structure
-      const equipment = equipmentByStructure[structureType.value] || [];
-      const equipmentList = document.getElementById('equipmentList');
-      equipmentList.innerHTML = '<ul>' + 
-        equipment.map(item => `<li>${item}</li>`).join('') +
-        '</ul>';
-      
-      // Générer préconisations selon désordres cochés
-      const checkedIssues = Array.from(document.querySelectorAll('.issue-checkbox:checked')).map(cb => cb.value);
-      const recommendations = [];
-      
-      checkedIssues.forEach(issue => {
-        if (investigationsByIssue[issue]) {
-          recommendations.push(...investigationsByIssue[issue]);
-        }
-      });
-      
-      // Préconisations générales si aucun désordre coché
-      if (recommendations.length === 0) {
-        recommendations.push(
-          "Inspection visuelle détaillée de l'ensemble de la structure",
-          "Relevé photographique complet",
-          "Vérification conformité aux plans d'exécution",
-          "Contrôles non destructifs selon normes en vigueur"
-        );
-      }
-      
-      const recommendationsList = document.getElementById('recommendationsList');
-      recommendationsList.innerHTML = '<ul>' + 
-        recommendations.map(item => `<li>${item}</li>`).join('') +
-        '</ul>';
+      // Créer la checklist complète d'équipement (toujours la même liste complète)
+      createEquipmentChecklist();
       
       // Afficher résultat
       buildingResult.style.display = 'block';
@@ -475,5 +1079,119 @@
     // Initialiser
     setupBuildingWebcam();
   </script>
+
+  <style>
+    /* Styles additionnels pour les nouvelles fonctionnalités */
+    .camera-info {
+      text-align: center;
+      margin-top: 10px;
+      padding: 8px 16px;
+      background: linear-gradient(135deg, rgba(30, 58, 138, 0.1), rgba(59, 130, 246, 0.05));
+      border-radius: 20px;
+      font-size: 0.9rem;
+      color: var(--primary-dark);
+      font-weight: 500;
+    }
+
+    #switchBuildingCamera {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+    }
+
+    #switchBuildingCamera:hover:not(:disabled) {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 30px rgba(16, 185, 129, 0.3);
+    }
+    
+    /* Styles pour la checklist d'équipement */
+    .equipment-checklist {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-sm);
+      max-height: 400px;
+      overflow-y: auto;
+      padding: var(--spacing-md);
+      border: 2px solid var(--gray);
+      border-radius: 8px;
+      background: var(--light);
+    }
+
+    .equipment-checkbox-label {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--spacing-md);
+      padding: var(--spacing-sm);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .equipment-checkbox-label:hover {
+      background: rgba(30, 58, 138, 0.05);
+    }
+
+    .equipment-checkbox {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+      accent-color: var(--primary);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .equipment-checkbox-label span {
+      color: var(--dark);
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .equipment-checkbox:checked + span {
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .download-actions {
+      margin-top: var(--spacing-2xl);
+      padding-top: var(--spacing-xl);
+      border-top: 2px solid var(--gray);
+      display: flex;
+      gap: var(--spacing-md);
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .equipment-intro {
+      margin-bottom: var(--spacing-md);
+      color: var(--gray-dark);
+      font-size: 0.9rem;
+      font-style: italic;
+    }
+
+    /* Styles pour les catégories d'équipement */
+    .equipment-category {
+      margin-bottom: var(--spacing-lg);
+      border: 1px solid var(--gray);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .equipment-category-title {
+      background: linear-gradient(135deg, rgba(30, 58, 138, 0.1), rgba(59, 130, 246, 0.05));
+      color: var(--primary-dark);
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin: 0;
+      padding: var(--spacing-sm) var(--spacing-md);
+      border-bottom: 1px solid var(--gray);
+    }
+
+    .equipment-items-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: var(--spacing-xs);
+      padding: var(--spacing-sm);
+      background: var(--light);
+    }
+  </style>
 </body>
 </html>
