@@ -2,9 +2,762 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>CIMEO Normandie - Analyse de fissures par IA</title>
   <link rel="stylesheet" href="assets/style.css">
+  <script src="assets/footer.js"></script>
+  <!-- TensorFlow.js et Teachable Machine pour l'IA -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.20.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+  <style>
+    /* CSS Responsive et Gestion Caméras pour Fissure */
+    :root {
+      --mobile-breakpoint: 768px;
+      --tablet-breakpoint: 1024px;
+      --camera-height-mobile: 250px;
+      --camera-height-desktop: 400px;
+    }
+
+    /* Media Element Responsive */
+    .media-element {
+      width: 100%;
+      height: var(--camera-height-desktop);
+      object-fit: cover;
+      border-radius: 12px;
+      border: 2px solid #e5e7eb;
+      background: #f8fafc;
+      transition: all 0.3s ease;
+    }
+
+    /* Camera Controls */
+    .camera-controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    /* Camera Selection */
+    .camera-selection {
+      background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+      border: 1px solid #0284c7;
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 16px;
+    }
+
+    .camera-selection h4 {
+      margin: 0 0 12px 0;
+      color: #0c4a6e;
+      font-size: 0.95rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .camera-options {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 8px;
+    }
+
+    .camera-option {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: 1px solid transparent;
+      background: rgba(255, 255, 255, 0.7);
+      min-height: 48px;
+    }
+
+    .camera-option:hover {
+      background: rgba(2, 132, 199, 0.1);
+      border-color: #0284c7;
+    }
+
+    .camera-option.active {
+      background: #0284c7;
+      color: white;
+      font-weight: 600;
+    }
+
+    .camera-option input[type="radio"] {
+      margin: 0;
+      accent-color: #0284c7;
+      width: 18px;
+      height: 18px;
+    }
+
+    .camera-option.active input[type="radio"] {
+      accent-color: white;
+    }
+
+    /* Model Status */
+    .model-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      background: linear-gradient(135deg, #fef3c7, #fbbf24);
+      border-radius: 20px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #92400e;
+      margin: 16px 0;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .model-status.loading {
+      background: linear-gradient(135deg, #dbeafe, #93c5fd);
+      color: #1e40af;
+    }
+
+    .model-status.ready {
+      background: linear-gradient(135deg, #ecfdf5, #a7f3d0);
+      color: #065f46;
+    }
+
+    .model-status.error {
+      background: linear-gradient(135deg, #fee2e2, #fca5a5);
+      color: #dc2626;
+    }
+
+    /* Device Info */
+    .device-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+      border-radius: 20px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #0c4a6e;
+      margin-top: 12px;
+      justify-content: center;
+    }
+
+    /* AI Analysis Section */
+    .ai-analysis-section {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Form Section Responsive */
+    .form-section {
+      margin-bottom: 24px;
+      border: 2px solid var(--gray);
+      border-radius: 12px;
+      padding: 20px;
+      background: linear-gradient(135deg, var(--gray-light) 0%, var(--light) 100%);
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #374151;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border-color 0.3s ease;
+      box-sizing: border-box;
+      font-family: inherit;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #0284c7;
+      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1);
+    }
+
+    .form-group textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    /* Upload Area */
+    .upload-area {
+      border: 2px dashed var(--accent);
+      border-radius: 12px;
+      padding: 32px 24px;
+      text-align: center;
+      margin: 16px 0;
+      background: linear-gradient(135deg, rgba(249, 115, 22, 0.05), rgba(249, 115, 22, 0.02));
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    .upload-area:hover {
+      border-color: var(--primary);
+      background: linear-gradient(135deg, rgba(30, 58, 138, 0.05), rgba(30, 58, 138, 0.02));
+      transform: translateY(-2px);
+    }
+
+    .upload-area.dragover {
+      border-color: var(--primary-light);
+      background: linear-gradient(135deg, rgba(30, 58, 138, 0.1), rgba(59, 130, 246, 0.05));
+      transform: scale(1.01);
+      box-shadow: var(--shadow-md);
+    }
+
+    .upload-icon {
+      font-size: 2.5rem;
+      margin-bottom: 16px;
+    }
+
+    .upload-area p {
+      color: var(--gray-dark);
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .upload-hint {
+      display: block;
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: var(--gray-dark);
+      opacity: 0.8;
+    }
+
+    /* Buttons Responsive */
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 48px;
+      box-sizing: border-box;
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7, #0369a1);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(2, 132, 199, 0.3);
+    }
+
+    .btn-secondary {
+      background: linear-gradient(135deg, #6b7280, #4b5563);
+      color: white;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(107, 114, 128, 0.3);
+    }
+
+    .btn-outline {
+      background: var(--light);
+      color: var(--primary);
+      border: 2px solid var(--primary);
+    }
+
+    .btn-outline:hover:not(:disabled) {
+      background: var(--primary);
+      color: var(--light);
+      transform: translateY(-2px);
+    }
+
+    .btn-large {
+      padding: 16px 32px;
+      font-size: 16px;
+      min-width: 240px;
+      min-height: 56px;
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Analysis Action */
+    .analysis-action {
+      text-align: center;
+      padding: 24px 0;
+      border-top: 2px solid var(--gray);
+      border-bottom: 2px solid var(--gray);
+      margin: 24px 0;
+    }
+
+    .analysis-hint {
+      margin-top: 12px;
+      color: var(--gray-dark);
+      font-size: 0.9rem;
+    }
+
+    /* Loading Section */
+    .loading-section {
+      text-align: center;
+      padding: 32px;
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(30, 58, 138, 0.02));
+      border: 2px solid var(--primary-light);
+      border-radius: 16px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .loading-spinner {
+      width: 60px;
+      height: 60px;
+      border: 4px solid var(--gray);
+      border-top: 4px solid var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+
+    .loading-section p {
+      color: var(--primary-dark);
+      font-weight: 600;
+      margin: 8px 0;
+    }
+
+    .loading-detail {
+      font-size: 0.9rem;
+      color: var(--gray-dark);
+      font-weight: 400;
+    }
+
+    /* Result Section */
+    .result-section {
+      margin-top: 32px;
+      padding: 24px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #ecfdf5 0%, var(--light) 100%);
+      border: 2px solid var(--success);
+      display: none;
+      text-align: center;
+      box-shadow: 0 12px 30px rgba(16, 185, 129, 0.15);
+      animation: slideUp 0.4s ease;
+    }
+
+    .result-section.show {
+      display: block;
+    }
+
+    .result-section.crack-detected {
+      background: linear-gradient(135deg, #fef2f2 0%, var(--light) 100%);
+      border-color: var(--error);
+      box-shadow: 0 12px 30px rgba(239, 68, 68, 0.15);
+    }
+
+    .result-icon {
+      font-size: 3rem;
+      margin-bottom: 16px;
+    }
+
+    .result-icon.no-detection {
+      color: var(--success);
+    }
+
+    .result-icon.detection-success {
+      color: var(--error);
+    }
+
+    .result-section h3 {
+      font-size: 1.3rem;
+      margin-bottom: 12px;
+    }
+
+    .result-section.crack-detected h3 {
+      color: var(--error);
+    }
+
+    .result-section p {
+      color: var(--gray-dark);
+      font-size: 0.95rem;
+    }
+
+    /* AI Results */
+    .ai-results {
+      margin: 24px 0;
+      padding: 20px;
+      background: linear-gradient(135deg, var(--gray-light) 0%, var(--light) 100%);
+      border-radius: 12px;
+      border: 2px solid var(--gray);
+    }
+
+    .ai-results h4 {
+      color: var(--primary-dark);
+      font-size: 1.1rem;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+
+    .ai-metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+    }
+
+    .metric-card {
+      background: var(--light);
+      padding: 16px;
+      border-radius: 8px;
+      text-align: center;
+      border: 2px solid var(--gray);
+      transition: all 0.3s ease;
+    }
+
+    .metric-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .metric-label {
+      font-size: 0.85rem;
+      color: var(--gray-dark);
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+
+    .metric-value {
+      font-size: 1.4rem;
+      color: var(--primary-dark);
+      font-weight: 700;
+    }
+
+    /* Additional Info */
+    .additional-info {
+      margin: 24px 0;
+      padding: 16px;
+      background: rgba(249, 115, 22, 0.05);
+      border-radius: 8px;
+      border-left: 4px solid var(--accent);
+    }
+
+    .additional-info h4 {
+      color: var(--accent);
+      font-size: 1rem;
+      margin-bottom: 12px;
+    }
+
+    .additional-info p {
+      margin: 8px 0;
+      color: var(--dark);
+    }
+
+    /* PDF Download Section */
+    .pdf-download-section {
+      margin-top: 24px;
+      padding: 16px;
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.05), rgba(239, 68, 68, 0.02));
+      border: 2px dashed var(--error);
+      border-radius: 12px;
+      text-align: center;
+    }
+
+    .pdf-download-section h4 {
+      color: var(--error);
+      font-size: 1rem;
+      margin-bottom: 8px;
+    }
+
+    .pdf-download-section p {
+      color: var(--gray-dark);
+      margin-bottom: 12px;
+    }
+
+    .pdf-download-section .btn {
+      background: linear-gradient(45deg, #dc2626, #ef4444);
+      color: white;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .pdf-download-section .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(220, 38, 38, 0.3);
+    }
+
+    /* Result Note */
+    .result-note {
+      margin-top: 16px;
+      padding: 12px;
+      background: rgba(249, 115, 22, 0.1);
+      border-left: 3px solid var(--accent);
+      border-radius: 4px;
+      font-size: 0.9rem;
+      color: var(--dark);
+      text-align: left;
+    }
+
+    .result-note ul {
+      margin-top: 8px;
+      padding-left: 20px;
+    }
+
+    .result-note li {
+      margin: 4px 0;
+    }
+
+    /* Result Actions */
+    .result-actions {
+      margin-top: 24px;
+      text-align: center;
+      padding-top: 16px;
+      border-top: 2px solid var(--gray);
+    }
+
+    /* Mobile Specific Styles */
+    @media (max-width: 768px) {
+      .media-element {
+        height: var(--camera-height-mobile);
+      }
+
+      .main-card {
+        padding: 16px;
+        margin: 0 8px;
+      }
+
+      .form-section {
+        padding: 16px;
+      }
+
+      .camera-controls {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      .camera-options {
+        grid-template-columns: 1fr;
+      }
+
+      .btn {
+        width: 100%;
+        margin: 4px 0;
+      }
+
+      .btn-large {
+        width: 100%;
+        min-width: auto;
+      }
+
+      .ai-metrics {
+        grid-template-columns: 1fr;
+      }
+
+      .upload-area {
+        padding: 24px 16px;
+      }
+
+      .upload-icon {
+        font-size: 2rem;
+      }
+
+      .loading-section {
+        padding: 24px 16px;
+      }
+
+      .loading-spinner {
+        width: 50px;
+        height: 50px;
+      }
+
+      .result-section {
+        padding: 16px;
+      }
+
+      .result-icon {
+        font-size: 2.5rem;
+      }
+
+      .result-section h3 {
+        font-size: 1.2rem;
+      }
+
+      .ai-results {
+        padding: 16px;
+      }
+
+      .additional-info {
+        padding: 12px;
+      }
+
+      .pdf-download-section {
+        padding: 12px;
+      }
+
+      .company-name {
+        font-size: 1.8rem;
+      }
+
+      .section-title {
+        font-size: 1.4rem;
+      }
+
+      .analysis-action {
+        padding: 16px 0;
+      }
+
+      .model-status {
+        font-size: 0.8rem;
+        padding: 10px 16px;
+      }
+    }
+
+    /* Very Small Mobile */
+    @media (max-width: 480px) {
+      .container {
+        padding: 0 8px;
+      }
+
+      .main-card {
+        margin: 0;
+        border-radius: 8px;
+        padding: 12px;
+      }
+
+      .media-element {
+        height: 200px;
+        border-radius: 8px;
+      }
+
+      .upload-area {
+        padding: 16px;
+      }
+
+      .form-group input,
+      .form-group select,
+      .form-group textarea {
+        padding: 10px;
+      }
+
+      .company-name {
+        font-size: 1.5rem;
+      }
+
+      .section-title {
+        font-size: 1.25rem;
+      }
+
+      .camera-option {
+        padding: 8px 12px;
+        font-size: 0.9rem;
+      }
+
+      .loading-section {
+        padding: 16px;
+      }
+
+      .result-section {
+        padding: 12px;
+      }
+
+      .btn-large {
+        padding: 14px 24px;
+        font-size: 15px;
+      }
+    }
+
+    /* Tablet Specific */
+    @media (min-width: 769px) and (max-width: 1024px) {
+      .camera-options {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .ai-metrics {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    /* Large Desktop */
+    @media (min-width: 1200px) {
+      .container {
+        max-width: 1200px;
+      }
+
+      .camera-options {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    /* Touch-friendly improvements */
+    @media (pointer: coarse) {
+      .btn {
+        min-height: 52px;
+        padding: 14px 24px;
+      }
+
+      .camera-option {
+        min-height: 52px;
+        padding: 12px 14px;
+      }
+
+      .upload-area {
+        padding: 32px 20px;
+      }
+    }
+
+    /* Animations */
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.8;
+      }
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Focus states for accessibility */
+    .btn:focus,
+    .camera-option:focus,
+    .upload-area:focus {
+      outline: 2px solid #0284c7;
+      outline-offset: 2px;
+    }
+  </style>
 </head>
 <body>
   <!-- Header -->
@@ -43,20 +796,41 @@
             <span class="upload-hint">L'IA analysera automatiquement la présence de fissures</span>
           </div>
 
-          <div class="controls">
-            <button type="button" id="captureBtn" class="btn btn-primary">
-              📸 Capturer avec caméra
+          <!-- Sélection des caméras -->
+          <div class="camera-selection" id="cameraSelection" style="display:none;">
+            <h4>🎥 Choisir la caméra</h4>
+            <div class="camera-options" id="cameraOptions">
+              <!-- Les options seront ajoutées dynamiquement -->
+            </div>
+          </div>
+
+          <div class="camera-controls controls">
+            <button type="button" id="captureBtn" class="btn btn-primary" disabled>
+              📸 Analyser avec caméra
             </button>
             <button type="button" id="uploadBtn" class="btn btn-secondary">
-              📤 Télécharger une image
+              📤 Analyser une image
+            </button>
+            <button type="button" id="switchCameraBtn" class="btn btn-outline">
+              🔄 Changer de caméra
             </button>
             <input type="file" id="fileInput" accept="image/*" style="display:none;">
+          </div>
+
+          <!-- Statut du modèle IA -->
+          <div id="modelStatus" class="model-status loading">
+            🤖 Initialisation du modèle IA...
+          </div>
+
+          <!-- Indicateur de caméra active -->
+          <div id="fissureCameraInfo" class="device-info" style="display:none;">
+            <span id="fissureCameraLabel">Caméra : -</span>
           </div>
         </fieldset>
 
         <!-- Étape 2: Informations complémentaires (optionnel) -->
         <fieldset class="form-section">
-          <legend>🏗️ Informations complémentaires (optionnel)</legend>
+          <legend>🗂️ Informations complémentaires (optionnel)</legend>
           
           <div class="form-group">
             <label for="materialType">Type de matériau</label>
@@ -80,59 +854,26 @@
           </div>
         </fieldset>
 
-        <!-- Bouton d'analyse -->
-        <div class="analysis-action">
-          <button type="button" id="analyzeBtn" class="btn btn-primary btn-large" disabled>
-            🤖 Lancer l'analyse IA
-          </button>
-          <p class="analysis-hint">Capturez ou téléchargez une image pour activer l'analyse</p>
-        </div>
-
-        <!-- Loading -->
-        <div id="loadingSection" class="loading-section" style="display:none;">
-          <div class="loading-spinner"></div>
-          <p>Analyse en cours par Intelligence Artificielle...</p>
-          <p class="loading-detail">Détection des fissures, classification, mesure d'ouverture...</p>
-        </div>
-
         <!-- Résultats -->
         <div id="resultSection" class="result-section" style="display:none;">
           
-          <!-- Aucune fissure détectée -->
-          <div id="noFissureResult" style="display:none;">
-            <div class="result-icon no-detection">❌</div>
-            <h3>Aucune fissure détectée</h3>
-            <p>L'analyse par IA n'a pas détecté de fissuration significative sur cette image.</p>
-            <div class="result-note">
-              <strong>Recommandations :</strong>
-              <ul>
-                <li>Vérifiez la qualité et la résolution de l'image</li>
-                <li>Assurez-vous que la zone à analyser est bien visible</li>
-                <li>Réessayez avec un autre angle de vue si nécessaire</li>
-              </ul>
-            </div>
-            <button type="button" id="retryBtn" class="btn btn-outline" style="margin-top: 20px;">
-              🔄 Analyser une autre image
-            </button>
-          </div>
-
-          <!-- Fissure détectée -->
-          <div id="fissureResult" style="display:none;">
-            <div class="result-icon detection-success">✅</div>
-            <h3>Fissure détectée</h3>
-            <p>L'Intelligence Artificielle a identifié une fissuration sur la structure analysée.</p>
+          <!-- Résultat générique -->
+          <div id="analysisResult">
+            <div class="result-icon" id="resultIcon">✅</div>
+            <h3 id="resultTitle">Analyse terminée</h3>
+            <p id="resultDescription">L'Intelligence Artificielle a analysé la structure.</p>
             
             <!-- Résultats de l'analyse IA -->
             <div class="ai-results">
               <h4>📊 Résultats de l'analyse IA</h4>
               <div class="ai-metrics">
                 <div class="metric-card">
-                  <div class="metric-label">Confiance de détection</div>
-                  <div class="metric-value" id="confidence">--</div>
+                  <div class="metric-label">Prédiction</div>
+                  <div class="metric-value" id="prediction">--</div>
                 </div>
                 <div class="metric-card">
-                  <div class="metric-label">Type estimé</div>
-                  <div class="metric-value" id="fissureType">--</div>
+                  <div class="metric-label">Confiance</div>
+                  <div class="metric-value" id="confidence">--</div>
                 </div>
               </div>
             </div>
@@ -145,15 +886,16 @@
               <p><strong>Remarques :</strong> <span id="resultNotes"></span></p>
             </div>
 
-            <!-- Lien vers le PDF -->
-            <div class="pdf-download-section">
+            <!-- Lien vers le PDF (affiché seulement si fissure détectée) -->
+            <div class="pdf-download-section" id="pdfSection" style="display:none;">
               <h4>📄 Guide technique de diagnostic</h4>
               <p>Pour une analyse détaillée et les recommandations d'intervention, consultez le guide complet :</p>
-              <a href="https://gwendalrouault0-oss.github.io/Guide-sur-les-pathologies-des-ouvrages---CIMEO/pdf/Fissuration.pdf" 
+              <a href="#" 
                  target="_blank" 
-                 class="btn btn-primary btn-large" 
+                 id="pdfLink"
+                 class="btn btn-large" 
                  style="margin-top: 15px;">
-                📥 Télécharger le Guide de diagnostic des fissures (PDF)
+                ⚠️ Télécharger le protocole d'intervention
               </a>
             </div>
 
@@ -174,204 +916,434 @@
     </div>
   </div>
 
-  <!-- Footer -->
-  <div class="footer">
-    <p>© 2024 CIMEO Normandie - Gwendal ROUAULT</p>
-    <p class="footer-subtitle">Diagnostic de structures par Intelligence Artificielle</p>
-  </div>
-
   <!-- Scripts -->
   <script>
-    const webcam = document.getElementById('fissureWebcam');
-    const canvas = document.getElementById('fissureCanvas');
-    const ctx = canvas.getContext('2d');
-    const imageElement = document.getElementById('fissureImage');
-    const analyzeBtn = document.getElementById('analyzeBtn');
-    const loadingSection = document.getElementById('loadingSection');
-    const resultSection = document.getElementById('resultSection');
+    // Variables globales pour Teachable Machine
+    let model = null;
+    let webcam = null;
+    let canvas = null;
+    let ctx = null;
     let stream = null;
-    let currentImageData = null;
+    let currentFacingMode = "user"; // Caméra avant par défaut
 
-    // Initialiser la webcam
+    // Configuration du modèle et des classes
+    const config = {
+      modelURL: 'https://teachablemachine.withgoogle.com/models/rVulDxd6m/',
+      classes: ["Structure saine", "Fissure détectée"],
+      pdfs: [null, "https://gwendalrouault0-oss.github.io/Guide-sur-les-pathologies-des-ouvrages---CIMEO/pdf/Fissuration.pdf"]
+    };
+
+    // Éléments DOM
+    const elements = {
+      webcam: document.getElementById('fissureWebcam'),
+      canvas: document.getElementById('fissureCanvas'),
+      image: document.getElementById('fissureImage'),
+      captureBtn: document.getElementById('captureBtn'),
+      uploadBtn: document.getElementById('uploadBtn'),
+      switchCameraBtn: document.getElementById('switchCameraBtn'),
+      fileInput: document.getElementById('fileInput'),
+      uploadArea: document.getElementById('fissureUpload'),
+      modelStatus: document.getElementById('modelStatus'),
+      resultSection: document.getElementById('resultSection'),
+      prediction: document.getElementById('prediction'),
+      confidence: document.getElementById('confidence'),
+      pdfLink: document.getElementById('pdfLink'),
+      pdfSection: document.getElementById('pdfSection'),
+      newAnalysisBtn: document.getElementById('newAnalysisBtn'),
+      resultIcon: document.getElementById('resultIcon'),
+      resultTitle: document.getElementById('resultTitle'),
+      resultDescription: document.getElementById('resultDescription'),
+      cameraInfo: document.getElementById('fissureCameraInfo'),
+      cameraLabel: document.getElementById('fissureCameraLabel'),
+      cameraSelection: document.getElementById('cameraSelection'),
+      cameraOptions: document.getElementById('cameraOptions')
+    };
+
+    let availableCameras = [];
+    let selectedCameraId = null;
+    let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+    // Initialisation du modèle IA
+    async function initializeModel() {
+      try {
+        elements.modelStatus.className = 'model-status loading';
+        elements.modelStatus.textContent = '🤖 Chargement du modèle IA...';
+        
+        model = await tmImage.load(
+          config.modelURL + 'model.json',
+          config.modelURL + 'metadata.json'
+        );
+        
+        elements.modelStatus.className = 'model-status ready';
+        elements.modelStatus.textContent = '✅ Modèle IA prêt !';
+        
+        await setupWebcam();
+        
+      } catch (error) {
+        console.error('Erreur lors du chargement du modèle:', error);
+        elements.modelStatus.className = 'model-status error';
+        elements.modelStatus.textContent = '❌ Erreur de chargement du modèle IA';
+      }
+    }
+
+    // Fonction pour détecter le type de caméra
+    function getCameraType(label) {
+      const lowerLabel = label.toLowerCase();
+      if (lowerLabel.includes('front') || lowerLabel.includes('user') || lowerLabel.includes('facetime')) {
+        return { type: 'front', icon: '🤳', name: 'Caméra frontale' };
+      } else if (lowerLabel.includes('back') || lowerLabel.includes('rear') || lowerLabel.includes('environment')) {
+        return { type: 'back', icon: '📱', name: 'Caméra arrière' };
+      } else {
+        return { type: 'unknown', icon: '📹', name: label || 'Caméra' };
+      }
+    }
+
+    // Énumérer les caméras disponibles
+    async function getCameras() {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        availableCameras = devices.filter(device => device.kind === 'videoinput');
+        
+        if (availableCameras.length > 1) {
+          displayCameraOptions();
+        } else if (availableCameras.length === 1) {
+          selectedCameraId = availableCameras[0].deviceId;
+        }
+        
+        return availableCameras;
+      } catch (error) {
+        console.warn('Impossible d\'énumérer les caméras', error);
+        return [];
+      }
+    }
+
+    // Afficher les options de caméra
+    function displayCameraOptions() {
+      if (availableCameras.length <= 1) return;
+
+      elements.cameraOptions.innerHTML = '';
+      
+      availableCameras.forEach((camera, index) => {
+        const cameraInfo = getCameraType(camera.label);
+        
+        const option = document.createElement('label');
+        option.className = 'camera-option';
+        option.setAttribute('tabindex', '0');
+        
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = 'cameraChoice';
+        radio.value = camera.deviceId;
+        radio.checked = index === 0;
+        
+        if (index === 0) {
+          selectedCameraId = camera.deviceId;
+          option.classList.add('active');
+        }
+        
+        const span = document.createElement('span');
+        span.textContent = `${cameraInfo.icon} ${cameraInfo.name}`;
+        
+        option.appendChild(radio);
+        option.appendChild(span);
+        
+        const selectCamera = () => {
+          document.querySelectorAll('.camera-option').forEach(opt => opt.classList.remove('active'));
+          option.classList.add('active');
+          selectedCameraId = camera.deviceId;
+          radio.checked = true;
+          setupWebcam();
+        };
+        
+        option.addEventListener('click', selectCamera);
+        option.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            selectCamera();
+          }
+        });
+        
+        elements.cameraOptions.appendChild(option);
+      });
+      
+      elements.cameraSelection.style.display = 'block';
+    }
+
+    // Configuration de la webcam
     async function setupWebcam() {
       try {
-        if (!navigator.mediaDevices?.getUserMedia) return;
-        stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { 
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
-          } 
-        });
-        webcam.srcObject = stream;
-        await webcam.play();
-      } catch (error) {
-        console.warn('Accès webcam non disponible', error);
-      }
-    }
-
-    // Capturer depuis webcam
-    document.getElementById('captureBtn').addEventListener('click', () => {
-      canvas.width = webcam.videoWidth;
-      canvas.height = webcam.videoHeight;
-      ctx.drawImage(webcam, 0, 0);
-      const imageData = canvas.toDataURL('image/jpeg', 0.95);
-      imageElement.src = imageData;
-      currentImageData = imageData;
-      imageElement.style.display = 'block';
-      webcam.style.display = 'none';
-      analyzeBtn.disabled = false;
-    });
-
-    // Upload fichier
-    document.getElementById('uploadBtn').addEventListener('click', () => {
-      document.getElementById('fileInput').click();
-    });
-
-    document.getElementById('fissureUpload').addEventListener('click', () => {
-      document.getElementById('fileInput').click();
-    });
-
-    document.getElementById('fileInput').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file || !file.type.startsWith('image/')) {
-        alert('Veuillez sélectionner une image valide');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        imageElement.src = ev.target.result;
-        currentImageData = ev.target.result;
-        imageElement.style.display = 'block';
-        webcam.style.display = 'none';
-        analyzeBtn.disabled = false;
-      };
-      reader.readAsDataURL(file);
-    });
-
-    // Drag & Drop
-    const uploadArea = document.getElementById('fissureUpload');
-    uploadArea.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      uploadArea.classList.add('dragover');
-    });
-
-    uploadArea.addEventListener('dragleave', () => {
-      uploadArea.classList.remove('dragover');
-    });
-
-    uploadArea.addEventListener('drop', (e) => {
-      e.preventDefault();
-      uploadArea.classList.remove('dragover');
-      const file = e.dataTransfer.files[0];
-      if (file && file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          imageElement.src = ev.target.result;
-          currentImageData = ev.target.result;
-          imageElement.style.display = 'block';
-          webcam.style.display = 'none';
-          analyzeBtn.disabled = false;
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-
-    // Analyse IA
-    analyzeBtn.addEventListener('click', async () => {
-      if (!currentImageData) return;
-
-      // Afficher loading
-      loadingSection.style.display = 'block';
-      resultSection.style.display = 'none';
-      
-      // Scroll vers loading
-      setTimeout(() => {
-        loadingSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 100);
-
-      // Simulation de l'analyse IA (remplacer par vraie API)
-      // ICI TU INTÉGRERAS TON MODÈLE IA
-      setTimeout(() => {
-        performAIAnalysis();
-      }, 3000);
-    });
-
-    // Fonction d'analyse IA (à remplacer par ton vrai modèle)
-    function performAIAnalysis() {
-      // SIMULATION - Remplace cette partie par ton API/modèle IA réel
-      const fissureDetected = Math.random() > 0.3; // 70% de chance de détecter
-      
-      loadingSection.style.display = 'none';
-      resultSection.style.display = 'block';
-      resultSection.classList.add('show');
-
-      if (fissureDetected) {
-        // Fissure détectée
-        document.getElementById('noFissureResult').style.display = 'none';
-        document.getElementById('fissureResult').style.display = 'block';
-
-        // Résultats simulés (remplacer par vrais résultats IA)
-        document.getElementById('confidence').textContent = (85 + Math.random() * 14).toFixed(1) + '%';
-        
-        const types = ['Fissure fine', 'Fissure moyenne', 'Fissure large', 'Microfissure'];
-        document.getElementById('fissureType').textContent = types[Math.floor(Math.random() * types.length)];
-        
-        document.getElementById('openingWidth').textContent = (0.1 + Math.random() * 3).toFixed(2) + ' mm';
-        
-        const severities = [
-          { text: 'Faible', color: '#10b981' },
-          { text: 'Modérée', color: '#f59e0b' },
-          { text: 'Élevée', color: '#ef4444' }
-        ];
-        const severity = severities[Math.floor(Math.random() * severities.length)];
-        const severityEl = document.getElementById('severity');
-        severityEl.textContent = severity.text;
-        severityEl.style.color = severity.color;
-
-        // Infos complémentaires si renseignées
-        const material = document.getElementById('materialType').value;
-        const location = document.getElementById('location').value;
-        const notes = document.getElementById('notes').value;
-
-        if (material || location || notes) {
-          document.getElementById('additionalInfo').style.display = 'block';
-          document.getElementById('resultMaterial').textContent = material ? 
-            document.querySelector(`#materialType option[value="${material}"]`).textContent : 'Non renseigné';
-          document.getElementById('resultLocation').textContent = location || 'Non renseigné';
-          document.getElementById('resultNotes').textContent = notes || 'Aucune';
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw new Error("Caméra non supportée");
         }
 
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
+
+        const cameras = await getCameras();
+        if (cameras.length === 0) return;
+
+        const constraints = {
+          video: {
+            width: { ideal: isMobile ? 1280 : 1920 },
+            height: { ideal: isMobile ? 720 : 1080 },
+            facingMode: currentFacingMode
+          }
+        };
+
+        if (selectedCameraId) {
+          constraints.video.deviceId = { exact: selectedCameraId };
+          delete constraints.video.facingMode;
+        }
+
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        elements.webcam.srcObject = stream;
+        await elements.webcam.play();
+
+        canvas = elements.canvas;
+        ctx = canvas.getContext('2d');
+        elements.captureBtn.disabled = false;
+
+        const currentCamera = cameras.find(cam => cam.deviceId === selectedCameraId) || cameras[0];
+        if (currentCamera) {
+          elements.cameraInfo.style.display = 'block';
+          const cameraInfo = getCameraType(currentCamera.label);
+          elements.cameraLabel.textContent = `${cameraInfo.icon} ${cameraInfo.name}`;
+        }
+
+      } catch (error) {
+        console.warn('Erreur d\'accès à la webcam:', error);
+        elements.captureBtn.disabled = true;
+        handleCameraError(error);
+      }
+    }
+
+    // Gestion des erreurs de caméra
+    function handleCameraError(error) {
+      let message = 'Erreur caméra: ';
+      
+      switch(error.name) {
+        case 'NotAllowedError':
+          message += 'Accès refusé. Autorisez la caméra dans les paramètres.';
+          break;
+        case 'NotFoundError':
+          message += 'Aucune caméra détectée.';
+          break;
+        case 'NotReadableError':
+          message += 'Caméra utilisée par une autre application.';
+          break;
+        default:
+          message += 'Utilisez "Analyser une image" à la place.';
+      }
+      
+      elements.modelStatus.className = 'model-status error';
+      elements.modelStatus.textContent = message;
+    }
+
+    // Affichage des résultats
+    function displayResults(classIndex, confidence) {
+      const className = config.classes[classIndex];
+      const confidencePercent = (confidence * 100).toFixed(1);
+      const isCrackDetected = classIndex === 1;
+
+      elements.prediction.textContent = className;
+      elements.confidence.textContent = `${confidencePercent}%`;
+
+      // Mise à jour de l'interface selon le résultat
+      if (isCrackDetected) {
+        elements.resultSection.className = 'result-section crack-detected show';
+        elements.resultIcon.textContent = '⚠️';
+        elements.resultIcon.className = 'result-icon detection-success';
+        elements.resultTitle.textContent = 'Fissure détectée';
+        elements.resultDescription.textContent = 'L\'Intelligence Artificielle a identifié une fissuration sur la structure analysée.';
+        
+        // Afficher le lien PDF
+        if (config.pdfs[1]) {
+          elements.pdfLink.href = config.pdfs[1];
+          elements.pdfSection.style.display = 'block';
+        }
       } else {
-        // Aucune fissure
-        document.getElementById('noFissureResult').style.display = 'block';
-        document.getElementById('fissureResult').style.display = 'none';
+        elements.resultSection.className = 'result-section show';
+        elements.resultIcon.textContent = '✅';
+        elements.resultIcon.className = 'result-icon no-detection';
+        elements.resultTitle.textContent = 'Structure saine';
+        elements.resultDescription.textContent = 'L\'analyse par IA n\'a pas détecté de fissuration significative.';
+        
+        // Masquer le lien PDF
+        elements.pdfSection.style.display = 'none';
       }
 
-      // Scroll vers résultat
+      // Afficher les infos complémentaires si renseignées
+      const material = document.getElementById('materialType').value;
+      const location = document.getElementById('location').value;
+      const notes = document.getElementById('notes').value;
+
+      if (material || location || notes) {
+        document.getElementById('additionalInfo').style.display = 'block';
+        document.getElementById('resultMaterial').textContent = material ? 
+          document.querySelector(`#materialType option[value="${material}"]`).textContent : 'Non renseigné';
+        document.getElementById('resultLocation').textContent = location || 'Non renseigné';
+        document.getElementById('resultNotes').textContent = notes || 'Aucune';
+      }
+
+      elements.resultSection.style.display = 'block';
+      
+      // Mettre à jour le statut
+      elements.modelStatus.className = isCrackDetected ? 'model-status error' : 'model-status ready';
+      elements.modelStatus.textContent = isCrackDetected ? '⚠️ Fissure détectée !' : '✅ Structure saine';
+
+      // Scroll vers le résultat
       setTimeout(() => {
-        resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        elements.resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
     }
 
-    // Boutons de réinitialisation
+    // Analyse d'image
+    async function analyzeImage(source = 'camera') {
+      if (!model) {
+        alert("Modèle IA non chargé");
+        return;
+      }
+
+      let img = source === 'camera' ? elements.webcam : elements.image;
+      
+      canvas.width = img.videoWidth || img.naturalWidth;
+      canvas.height = img.videoHeight || img.naturalHeight;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      elements.modelStatus.className = 'model-status loading';
+      elements.modelStatus.textContent = '🔄 Analyse en cours...';
+
+      try {
+        let predictions = await model.predict(canvas);
+        let maxIndex = 0, maxProb = 0;
+        
+        predictions.forEach((pred, i) => {
+          if (pred.probability > maxProb) {
+            maxProb = pred.probability;
+            maxIndex = i;
+          }
+        });
+
+        displayResults(maxIndex, maxProb);
+        
+      } catch (error) {
+        console.error('Erreur lors de l\'analyse:', error);
+        elements.modelStatus.className = 'model-status error';
+        elements.modelStatus.textContent = '❌ Erreur d\'analyse';
+      }
+    }
+
+    // Gestion des fichiers uploadés
+    function handleFile(file) {
+      if (!file || !file.type.startsWith('image/')) {
+        alert("Veuillez sélectionner une image valide");
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        elements.image.src = e.target.result;
+        elements.image.style.display = 'block';
+        elements.webcam.style.display = 'none';
+        elements.cameraInfo.style.display = 'none';
+        elements.cameraSelection.style.display = 'none';
+        analyzeImage('upload');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Réinitialisation pour nouvelle analyse
     function resetAnalysis() {
-      currentImageData = null;
-      imageElement.style.display = 'none';
-      webcam.style.display = 'block';
-      resultSection.style.display = 'none';
-      loadingSection.style.display = 'none';
-      analyzeBtn.disabled = true;
+      elements.resultSection.style.display = 'none';
+      elements.image.style.display = 'none';
+      elements.webcam.style.display = 'block';
+      
+      // Réafficher la sélection de caméra si nécessaire
+      if (availableCameras.length > 1) {
+        elements.cameraSelection.style.display = 'block';
+      }
+      
+      // Réafficher les infos caméra si disponible
+      if (stream && selectedCameraId) {
+        elements.cameraInfo.style.display = 'block';
+      }
+      
+      elements.modelStatus.className = 'model-status ready';
+      elements.modelStatus.textContent = '✅ Modèle IA prêt !';
+      
       document.getElementById('materialType').value = '';
       document.getElementById('location').value = '';
       document.getElementById('notes').value = '';
+      document.getElementById('additionalInfo').style.display = 'none';
+      
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    document.getElementById('retryBtn')?.addEventListener('click', resetAnalysis);
-    document.getElementById('newAnalysisBtn')?.addEventListener('click', resetAnalysis);
+    // Event Listeners
+    elements.captureBtn.addEventListener('click', () => analyzeImage('camera'));
+    elements.uploadBtn.addEventListener('click', () => elements.fileInput.click());
+    elements.uploadArea.addEventListener('click', () => elements.fileInput.click());
+    elements.fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+    elements.newAnalysisBtn.addEventListener('click', resetAnalysis);
 
-    // Initialiser
-    setupWebcam();
+    // Switch camera
+    elements.switchCameraBtn.addEventListener('click', async () => {
+      currentFacingMode = currentFacingMode === "user" ? "environment" : "user";
+      await setupWebcam();
+    });
+
+    // Drag & Drop
+    elements.uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      elements.uploadArea.classList.add('dragover');
+    });
+
+    elements.uploadArea.addEventListener('dragleave', () => {
+      elements.uploadArea.classList.remove('dragover');
+    });
+
+    elements.uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      elements.uploadArea.classList.remove('dragover');
+      handleFile(e.dataTransfer.files[0]);
+    });
+
+    // Nettoyage des ressources
+    window.addEventListener('beforeunload', () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    });
+
+    // Gestion responsive de l'orientation mobile
+    if (isMobile) {
+      window.addEventListener('orientationchange', () => {
+        setTimeout(() => {
+          if (stream) {
+            setupWebcam();
+          }
+        }, 500);
+      });
+    }
+
+    // Raccourcis clavier
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && e.target === document.body && stream && elements.webcam.style.display !== 'none') {
+        e.preventDefault();
+        elements.captureBtn.click();
+      }
+    });
+
+    // Initialisation
+    document.addEventListener('DOMContentLoaded', initializeModel);
+
+    // Fallback si DOMContentLoaded déjà passé
+    if (document.readyState === 'loading') {
+      // Déjà géré par l'event listener ci-dessus
+    } else {
+      initializeModel();
+    }
   </script>
 </body>
 </html>

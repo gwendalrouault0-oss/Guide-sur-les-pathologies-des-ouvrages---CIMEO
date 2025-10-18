@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CIMEO Normandie - Espace Client</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script src="assets/footer.js"></script>
+  <script src="assets/auth.js"></script>
+</head>
+<body data-auth-required="true" data-auth-type="client">
+  <!-- Header -->
+  <div class="header">
+    <a href="index.html" class="logo-link">
+      <div class="logo">
+        <img src="assets/logo_cimeo_normandie.png" alt="CIMEO Normandie" class="logo-image">
+        <div>
+          <div class="company-name">CIMEO Normandie</div>
+          <div class="company-tagline">Diagnostic de structures par IA</div>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <!-- Navigation sera insérée automatiquement par auth.js -->
+
+  <!-- Main Container -->
+  <div class="container">
+    <!-- Bannière de bienvenue -->
+    <div class="welcome-banner">
+      <h1 id="welcomeMessage">Bienvenue dans votre espace client</h1>
+      <p>Gérez vos diagnostics et consultez l'historique de vos analyses</p>
+    </div>
+
+    <!-- Statistiques rapides -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">📊</div>
+        <div class="stat-content">
+          <h3 id="totalDiagnostics">0</h3>
+          <p>Diagnostics réalisés</p>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⚠️</div>
+        <div class="stat-content">
+          <h3 id="alertCount">0</h3>
+          <p>Alertes actives</p>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">✅</div>
+        <div class="stat-content">
+          <h3 id="completedCount">0</h3>
+          <p>Analyses terminées</p>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📅</div>
+        <div class="stat-content">
+          <h3 id="nextAppointment">-</h3>
+          <p>Prochain RDV</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions rapides -->
+    <div class="quick-actions">
+      <h2>Actions rapides</h2>
+      <div class="actions-grid">
+        <a href="desordres.html" class="action-card">
+          <div class="action-icon">🔍</div>
+          <h3>Nouvelle analyse</h3>
+          <p>Lancer une nouvelle analyse de pathologie</p>
+        </a>
+        <a href="batiment.html" class="action-card">
+          <div class="action-icon">🏗️</div>
+          <h3>Diagnostic bâtiment</h3>
+          <p>Évaluation complète d'un ouvrage</p>
+        </a>
+        <a href="#" onclick="downloadReports()" class="action-card">
+          <div class="action-icon">📄</div>
+          <h3>Mes rapports</h3>
+          <p>Télécharger vos rapports PDF</p>
+        </a>
+        <a href="#" onclick="contactSupport()" class="action-card">
+          <div class="action-icon">💬</div>
+          <h3>Support technique</h3>
+          <p>Contacter notre équipe</p>
+        </a>
+      </div>
+    </div>
+
+    <!-- Diagnostics récents -->
+    <div class="recent-diagnostics">
+      <h2>Diagnostics récents</h2>
+      <div class="diagnostics-table">
+        <div class="table-header">
+          <div>Date</div>
+          <div>Type</div>
+          <div>Localisation</div>
+          <div>Statut</div>
+          <div>Actions</div>
+        </div>
+        <div id="diagnosticsList" class="table-body">
+          <!-- Les diagnostics seront ajoutés dynamiquement -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Notifications -->
+    <div class="notifications-section">
+      <h2>Notifications</h2>
+      <div id="notificationsList" class="notifications-list">
+        <!-- Les notifications seront ajoutées dynamiquement -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Contact Support -->
+  <div id="supportModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Support technique</h3>
+        <span class="modal-close" onclick="closeSupportModal()">&times;</span>
+      </div>
+      <div class="modal-body">
+        <div class="support-options">
+          <div class="support-option">
+            <strong>Email :</strong> <a href="mailto:g.rouault@colza.fr">g.rouault@colza.fr</a>
+          </div>
+          <div class="support-option">
+            <strong>Téléphone :</strong> <a href="tel:0770217062">07 70 21 70 62</a>
+          </div>
+          <div class="support-option">
+            <strong>Heures :</strong> Lun-Ven 8h-18h
+          </div>
+        </div>
+        <div class="support-form">
+          <h4>Message rapide</h4>
+          <textarea id="supportMessage" placeholder="Décrivez votre demande..." rows="4"></textarea>
+          <button class="btn btn-primary" onclick="sendSupportMessage()">Envoyer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Le footer sera automatiquement ajouté par footer.js -->
+
+  <script>
+    // Données de démonstration pour les diagnostics
+    const demoData = {
+      diagnostics: [
+        {
+          id: 1,
+          date: '2024-01-15',
+          type: 'Fissuration',
+          location: 'Mur porteur Est',
+          status: 'Terminé',
+          severity: 'Modérée'
+        },
+        {
+          id: 2,
+          date: '2024-01-10',
+          type: 'Diagnostic bâtiment',
+          location: 'Bâtiment principal',
+          status: 'En cours',
+          severity: 'En attente'
+        },
+        {
+          id: 3,
+          date: '2024-01-05',
+          type: 'Corrosion',
+          location: 'Poutre métallique',
+          status: 'Terminé',
+          severity: 'Faible'
+        }
+      ],
+      notifications: [
+        {
+          id: 1,
+          type: 'info',
+          message: 'Votre rapport de diagnostic du 15/01 est disponible',
+          date: '2024-01-16'
+        },
+        {
+          id: 2,
+          type: 'warning',
+          message: 'Surveillance recommandée pour la fissuration détectée',
+          date: '2024-01-15'
+        },
+        {
+          id: 3,
+          type: 'success',
+          message: 'Diagnostic terminé avec succès',
+          date: '2024-01-14'
+        }
+      ]
+    };
+
+    // Initialisation de la page
+    document.addEventListener('DOMContentLoaded', function() {
+      const user = AUTH_SYSTEM.getCurrentUser();
+      if (user) {
+        // Personnaliser le message de bienvenue
+        document.getElementById('welcomeMessage').textContent = `Bienvenue ${user.name}`;
+        
+        // Charger les statistiques
+        loadStats();
+        
+        // Charger les diagnostics
+        loadDiagnostics();
+        
+        // Charger les notifications
+        loadNotifications();
+      }
+    });
+
+    // Charger les statistiques
+    function loadStats() {
+      document.getElementById('totalDiagnostics').textContent = demoData.diagnostics.length;
+      document.getElementById('alertCount').textContent = demoData.diagnostics.filter(d => d.severity === 'Modérée' || d.severity === 'Élevée').length;
+      document.getElementById('completedCount').textContent = demoData.diagnostics.filter(d => d.status === 'Terminé').length;
+      document.getElementById('nextAppointment').textContent = '25/01';
+    }
+
+    // Charger les diagnostics
+    function loadDiagnostics() {
+      const container = document.getElementById('diagnosticsList');
+      container.innerHTML = '';
+
+      demoData.diagnostics.forEach(diagnostic => {
+        const statusClass = diagnostic.status === 'Terminé' ? 'status-completed' : 'status-pending';
+        const severityClass = getSeverityClass(diagnostic.severity);
+        
+        const row = `
+          <div class="table-row">
+            <div>${formatDate(diagnostic.date)}</div>
+            <div>${diagnostic.type}</div>
+            <div>${diagnostic.location}</div>
+            <div><span class="status ${statusClass}">${diagnostic.status}</span></div>
+            <div class="table-actions">
+              <button class="btn-small btn-primary" onclick="viewDiagnostic(${diagnostic.id})">Voir</button>
+              ${diagnostic.status === 'Terminé' ? `<button class="btn-small btn-secondary" onclick="downloadReport(${diagnostic.id})">PDF</button>` : ''}
+            </div>
+          </div>
+        `;
+        container.insertAdjacentHTML('beforeend', row);
+      });
+    }
+
+    // Charger les notifications
+    function loadNotifications() {
+      const container = document.getElementById('notificationsList');
+      container.innerHTML = '';
+
+      demoData.notifications.forEach(notification => {
+        const typeClass = `notification-${notification.type}`;
+        const icon = getNotificationIcon(notification.type);
+        
+        const notif = `
+          <div class="notification ${typeClass}">
+            <div class="notification-icon">${icon}</div>
+            <div class="notification-content">
+              <p>${notification.message}</p>
+              <small>${formatDate(notification.date)}</small>
+            </div>
+          </div>
+        `;
+        container.insertAdjacentHTML('beforeend', notif);
+      });
+    }
+
+    // Fonctions utilitaires
+    function formatDate(dateStr) {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('fr-FR');
+    }
+
+    function getSeverityClass(severity) {
+      const classes = {
+        'Faible': 'severity-low',
+        'Modérée': 'severity-medium',
+        'Élevée': 'severity-high'
+      };
+      return classes[severity] || '';
+    }
+
+    function getNotificationIcon(type) {
+      const icons = {
+        'info': 'ℹ️',
+        'warning': '⚠️',
+        'success': '✅',
+        'error': '❌'
+      };
+      return icons[type] || 'ℹ️';
+    }
+
+    // Actions
+    function viewDiagnostic(id) {
+      alert(`Affichage du diagnostic #${id}`);
+    }
+
+    function downloadReport(id) {
+      alert(`Téléchargement du rapport #${id}`);
+    }
+
+    function downloadReports() {
+      alert('Téléchargement de tous vos rapports');
+    }
+
+    function contactSupport() {
+      document.getElementById('supportModal').style.display = 'flex';
+    }
+
+    function closeSupportModal() {
+      document.getElementById('supportModal').style.display = 'none';
+    }
+
+    function sendSupportMessage() {
+      const message = document.getElementById('supportMessage').value;
+      if (message.trim()) {
+        alert('Message envoyé ! Nous vous répondrons dans les plus brefs délais.');
+        closeSupportModal();
+        document.getElementById('supportMessage').value = '';
+      } else {
+        alert('Veuillez saisir un message');
+      }
+    }
+
+    // Fermer modal en cliquant dehors
+    window.onclick = function(event) {
+      const modal = document.getElementById('supportModal');
+      if (event.target === modal) {
+        closeSupportModal();
+      }
+    }
+  </script>
+</body>
+</html>
