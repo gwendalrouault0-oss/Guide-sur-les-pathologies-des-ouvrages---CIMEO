@@ -274,43 +274,11 @@
     const cameraLabel = document.getElementById('cameraLabel');
 
     let stream = null;
-    let availableCameras = [];
-    let currentCameraIndex = 0;
     let currentImageData = null;
     let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     let photoTaken = false;
     let isAnalyzing = false;
-
-    // Fonction pour détecter le type de caméra
-    function getCameraType(label) {
-      const lowerLabel = label.toLowerCase();
-      if (lowerLabel.includes('front') || lowerLabel.includes('user') || lowerLabel.includes('facetime')) {
-        return { type: 'front', icon: '🤳', name: 'Caméra frontale' };
-      } else if (lowerLabel.includes('back') || lowerLabel.includes('rear') || lowerLabel.includes('environment')) {
-        return { type: 'back', icon: '📱', name: 'Caméra arrière' };
-      } else {
-        return { type: 'unknown', icon: '📹', name: label || 'Caméra' };
-      }
-    }
-
-    // Énumérer les caméras disponibles
-    async function getCameras() {
-      try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        availableCameras = devices.filter(device => device.kind === 'videoinput');
-        
-        // Activer le bouton de changement de caméra s'il y en a plusieurs
-        const switchBtn = document.getElementById('switchCameraBtn');
-        if (availableCameras.length > 1) {
-          switchBtn.disabled = false;
-        }
-        
-        return availableCameras;
-      } catch (error) {
-        console.warn('Impossible d\'énumérer les caméras', error);
-        return [];
-      }
-    }
+    let isBackCamera = true; // true = arrière, false = avant
 
     // Initialiser la webcam
     async function setupWebcam() {
@@ -321,53 +289,45 @@
           stream.getTracks().forEach(track => track.stop());
         }
 
-        const cameras = await getCameras();
-        if (cameras.length === 0) return;
-
         const constraints = {
           video: { 
             width: { ideal: isMobile ? 1280 : 1920 },
-            height: { ideal: isMobile ? 720 : 1080 }
+            height: { ideal: isMobile ? 720 : 1080 },
+            facingMode: isBackCamera ? 'environment' : 'user'
           } 
         };
-
-        // Utiliser la caméra sélectionnée ou par défaut la caméra arrière
-        if (cameras.length > 0) {
-          const selectedCamera = cameras[currentCameraIndex] || cameras[0];
-          constraints.video.deviceId = { exact: selectedCamera.deviceId };
-        } else if (isMobile) {
-          constraints.video.facingMode = 'environment'; // Caméra arrière par défaut
-        }
 
         stream = await navigator.mediaDevices.getUserMedia(constraints);
         webcam.srcObject = stream;
         await webcam.play();
 
         // Mettre à jour le statut de la caméra
-        if (cameras.length > 0) {
-          const currentCamera = cameras[currentCameraIndex] || cameras[0];
-          const cameraInfo = getCameraType(currentCamera.label);
-          cameraStatus.style.display = 'flex';
-          cameraLabel.textContent = `📹 ${cameraInfo.name}`;
-        }
+        cameraStatus.style.display = 'flex';
+        cameraLabel.textContent = isBackCamera ? '📹 Caméra arrière' : '📹 Caméra frontale';
+        
+        // Activer le bouton de changement de caméra
+        document.getElementById('switchCameraBtn').disabled = false;
 
       } catch (error) {
         console.warn('Accès webcam non disponible', error);
-        // Fallback pour mobile
-        if (isMobile) {
-          try {
-            const fallbackConstraints = {
-              video: { facingMode: 'environment' }
-            };
-            stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
-            webcam.srcObject = stream;
-            await webcam.play();
-            
-            cameraStatus.style.display = 'flex';
-            cameraLabel.textContent = '📹 Caméra arrière';
-          } catch (fallbackError) {
-            console.warn('Fallback camera failed', fallbackError);
-          }
+        // Fallback
+        try {
+          const fallbackConstraints = {
+            video: { 
+              width: { ideal: 640 },
+              height: { ideal: 480 }
+            }
+          };
+          stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+          webcam.srcObject = stream;
+          await webcam.play();
+          
+          cameraStatus.style.display = 'flex';
+          cameraLabel.textContent = '📹 Caméra par défaut';
+          document.getElementById('switchCameraBtn').disabled = false;
+        } catch (fallbackError) {
+          console.warn('Fallback camera failed', fallbackError);
+          document.getElementById('switchCameraBtn').disabled = true;
         }
       }
     }
@@ -375,9 +335,13 @@
     // Changer de caméra
     document.getElementById('switchCameraBtn').addEventListener('click', async (e) => {
       e.preventDefault();
-      if (availableCameras.length <= 1 || photoTaken) return;
+      if (photoTaken) return;
       
-      currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
+      // Basculer entre arrière et avant
+      isBackCamera = !isBackCamera;
+      console.log('Changement vers caméra:', isBackCamera ? 'arrière' : 'avant');
+      
+      // Réinitialiser la webcam avec la nouvelle caméra
       await setupWebcam();
     });
 
@@ -568,11 +532,11 @@
       imageElement.style.display = 'none';
       imageElement.classList.remove('photo-taken');
       webcam.style.display = 'block';
-      cameraStatus.style.display = availableCameras.length > 0 ? 'flex' : 'none';
+      cameraStatus.style.display = 'flex';
       
       // Remettre les boutons dans l'état initial
       document.getElementById('captureBtn').textContent = '📸 Prendre une photo';
-      document.getElementById('switchCameraBtn').disabled = availableCameras.length <= 1;
+      document.getElementById('switchCameraBtn').disabled = false;
       analyzeBtn.disabled = true;
       
       // Réinitialiser les résultats
@@ -585,7 +549,7 @@
       document.getElementById('notes').value = '';
       
       // Réinitialiser la caméra
-      currentCameraIndex = 0;
+      isBackCamera = true;
       setupWebcam();
       
       // Scroll vers le haut
