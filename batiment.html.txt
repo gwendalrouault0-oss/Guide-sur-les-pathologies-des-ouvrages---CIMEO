@@ -2,11 +2,432 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>CIMEO Normandie - Diagnostic de bâtiment</title>
   <link rel="stylesheet" href="assets/style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="assets/footer.js"></script>
+  <style>
+    /* CSS Responsive et Gestion Caméras */
+    :root {
+      --mobile-breakpoint: 768px;
+      --tablet-breakpoint: 1024px;
+      --camera-height-mobile: 250px;
+      --camera-height-desktop: 400px;
+    }
+
+    /* Media Element Responsive */
+    .media-element {
+      width: 100%;
+      height: var(--camera-height-desktop);
+      object-fit: cover;
+      border-radius: 12px;
+      border: 2px solid #e5e7eb;
+      background: #f8fafc;
+      transition: all 0.3s ease;
+    }
+
+    /* Camera Controls */
+    .camera-controls {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .camera-controls .btn {
+      min-width: 160px;
+    }
+
+    .btn-camera-switch {
+      background: linear-gradient(135deg, #6b7280, #4b5563);
+      color: white;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-camera-switch:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(107, 114, 128, 0.3);
+    }
+
+    .btn-camera-switch:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Camera Status */
+    .camera-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+      border-radius: 20px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #1e40af;
+      margin-top: 12px;
+      justify-content: center;
+    }
+
+    /* Styles pour l'état de prise de photo */
+    .photo-taken {
+      border-color: #059669 !important;
+      box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
+    }
+
+    .media-element.photo-taken {
+      border-color: #059669;
+    }
+
+    /* States pour les boutons */
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* Form Responsive */
+    .form-section {
+      margin-bottom: 24px;
+      border: 2px solid var(--gray);
+      border-radius: 12px;
+      padding: 20px;
+      background: linear-gradient(135deg, var(--gray-light) 0%, var(--light) 100%);
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #374151;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border-color 0.3s ease;
+      box-sizing: border-box;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #0284c7;
+      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1);
+    }
+
+    /* Checkbox Groups */
+    .checkbox-group {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 12px;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      min-height: 48px;
+    }
+
+    .checkbox-label:hover {
+      background: #f8fafc;
+      border-color: #0284c7;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      margin: 0;
+      accent-color: #0284c7;
+    }
+
+    /* Equipment Section */
+    .equipment-category {
+      margin-bottom: 20px;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .equipment-category-title {
+      background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+      color: #0c4a6e;
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin: 0;
+      padding: 12px 16px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .equipment-items-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 8px;
+      padding: 16px;
+      background: #fafafa;
+    }
+
+    .equipment-checkbox-label {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      min-height: 44px;
+    }
+
+    .equipment-checkbox-label:hover {
+      background: rgba(2, 132, 199, 0.05);
+    }
+
+    .equipment-checkbox {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      accent-color: #0284c7;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    /* Buttons Responsive */
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 48px;
+      box-sizing: border-box;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #0284c7, #0369a1);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(2, 132, 199, 0.3);
+    }
+
+    .btn-secondary {
+      background: linear-gradient(135deg, #6b7280, #4b5563);
+      color: white;
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Mobile Specific Styles */
+    @media (max-width: 768px) {
+      .media-element {
+        height: var(--camera-height-mobile);
+      }
+
+      .main-card {
+        padding: 16px;
+        margin: 0 8px;
+      }
+
+      .form-section {
+        padding: 16px;
+      }
+
+      .camera-controls {
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .camera-controls .btn {
+        width: 100%;
+        max-width: 300px;
+      }
+
+      .checkbox-group {
+        grid-template-columns: 1fr;
+      }
+
+      .equipment-items-grid {
+        grid-template-columns: 1fr;
+        padding: 12px;
+      }
+
+      .btn {
+        width: 100%;
+        margin: 4px 0;
+      }
+
+      .controls {
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .form-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .download-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .company-name {
+        font-size: 1.8rem;
+      }
+
+      .section-title {
+        font-size: 1.4rem;
+      }
+    }
+
+    /* Very Small Mobile */
+    @media (max-width: 480px) {
+      .container {
+        padding: 0 8px;
+      }
+
+      .main-card {
+        margin: 0;
+        border-radius: 8px;
+      }
+
+      .media-element {
+        height: 200px;
+        border-radius: 8px;
+      }
+
+      .upload-area {
+        padding: 16px;
+      }
+
+      .upload-icon {
+        font-size: 2rem;
+      }
+
+      .form-group input,
+      .form-group select,
+      .form-group textarea {
+        padding: 10px;
+      }
+
+      .company-name {
+        font-size: 1.5rem;
+      }
+
+      .section-title {
+        font-size: 1.25rem;
+      }
+    }
+
+    /* Tablet Specific */
+    @media (min-width: 769px) and (max-width: 1024px) {
+      .checkbox-group {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .equipment-items-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    /* Large Desktop */
+    @media (min-width: 1200px) {
+      .container {
+        max-width: 1200px;
+      }
+
+      .checkbox-group {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .equipment-items-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    /* Touch-friendly improvements */
+    @media (pointer: coarse) {
+      .btn {
+        min-height: 52px;
+        padding: 14px 24px;
+      }
+
+      .checkbox-label,
+      .equipment-checkbox-label {
+        min-height: 48px;
+        padding: 12px;
+      }
+
+      .equipment-checkbox,
+      .checkbox-label input[type="checkbox"] {
+        width: 22px;
+        height: 22px;
+      }
+    }
+
+    /* Loading states for mobile */
+    .loading-section {
+      padding: 20px;
+    }
+
+    .loading-spinner {
+      width: 50px;
+      height: 50px;
+    }
+
+    @media (max-width: 768px) {
+      .loading-section {
+        padding: 16px;
+      }
+
+      .loading-spinner {
+        width: 40px;
+        height: 40px;
+      }
+
+      .result-section {
+        padding: 16px;
+      }
+
+      .result-details {
+        padding: 12px;
+        font-size: 0.9rem;
+      }
+    }
+  </style>
 </head>
 <body>
   <!-- Header -->
@@ -45,11 +466,12 @@
             <span class="upload-hint">Vue d'ensemble du bâtiment recommandée</span>
           </div>
 
-          <div class="controls">
+          <!-- Nouveaux contrôles caméra -->
+          <div class="camera-controls">
             <button type="button" id="captureBuilding" class="btn btn-primary">
-              📸 Capturer avec caméra
+              📸 Prendre une photo
             </button>
-            <button type="button" id="switchBuildingCamera" class="btn btn-secondary" disabled>
+            <button type="button" id="switchCameraBuilding" class="btn btn-camera-switch" disabled>
               🔄 Changer caméra
             </button>
             <button type="button" id="uploadBuildingBtn" class="btn btn-secondary">
@@ -59,14 +481,14 @@
           </div>
           
           <!-- Indicateur de caméra active -->
-          <div id="buildingCameraInfo" class="camera-info" style="display:none;">
-            <span id="buildingCameraLabel">Caméra : -</span>
+          <div id="buildingCameraStatus" class="camera-status" style="display:none;">
+            <span id="buildingCameraLabel">📹 Caméra : Arrière</span>
           </div>
         </fieldset>
 
         <!-- Section Type de bâtiment -->
         <fieldset class="form-section">
-          <legend>🗏️ Type de structure</legend>
+          <legend>🏗️ Type de structure</legend>
           
           <div class="form-group">
             <label for="buildingType">Type d'ouvrage</label>
@@ -207,6 +629,9 @@
           <button type="button" id="generateDevis" class="btn btn-secondary" disabled>
             📝 Générer Devis Word
           </button>
+          <button type="button" id="newAnalysisBtn" class="btn btn-outline">
+            🔄 Nouvelle analyse
+          </button>
         </div>
       </div>
     </div>
@@ -226,210 +651,50 @@
     const buildingImage = document.getElementById('buildingImage');
     const buildingForm = document.getElementById('batimentForm');
     const buildingResult = document.getElementById('buildingResult');
-    const switchBuildingCamera = document.getElementById('switchBuildingCamera');
-    const buildingCameraInfo = document.getElementById('buildingCameraInfo');
+    const buildingCameraStatus = document.getElementById('buildingCameraStatus');
     const buildingCameraLabel = document.getElementById('buildingCameraLabel');
     
     let buildingStream = null;
     let availableBuildingCameras = [];
-    let currentBuildingCameraIndex = 0;
+    let currentCameraIndex = 0;
     let capturedImageData = null;
+    let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    let photoTaken = false;
+    let isAnalyzing = false;
 
-    // Liste complète du matériel basée sur les documents fournis
-    const completeEquipmentList = {
-      // Sondage destructifs
-      sondage_destructifs: [
-        "Carotteuse",
-        "Échafaudage / Échelle télescopique / PEIRL / Escabeau", 
-        "Piquer sur batterie / Piquer 5kg",
-        "Piquer 10kg",
-        "Pied de biche / Barre à mine",
-        "Scie sabre / Scie sauteuse / Scie à placo",
-        "Meuleuse",
-        "Pelle / Pioche"
-      ],
-      
-      // Sondage non destructif
-      sondage_non_destructifs: [
-        "Radar GSSI (+ canne)",
-        "Ferroscan",
-        "Humidimètre", 
-        "Ultrasons",
-        "Piccolo / Elcomètre / Zonotip",
-        "Endoscope",
-        "Scléromètre",
-        "Corrosimètre",
-        "BLK360",
-        "Pachomètre (détecteur d'armatures)"
-      ],
-      
-      // Électricité
-      electricite: [
-        "Rallonges électriques",
-        "Groupe électrogène",
-        "Essence",
-        "Éclairage (projecteurs)"
-      ],
-      
-      // Protection / Nettoyage
-      protection_nettoyage: [
-        "Aspirateur et balai",
-        "Polyane / Zipwall", 
-        "Masque / Gants",
-        "Sacs à gravats"
-      ],
-      
-      // Matériel de rebouchage
-      rebouchage: [
-        "Truelle / Taloche",
-        "Gamate",
-        "Bidon d'eau",
-        "Mortier",
-        "Béton"
-      ],
-      
-      // Location matériel
-      location: [
-        "Nacelle",
-        "Carotteuse (location)",
-        "Carrosimètre", 
-        "Matériel spécialisé selon besoin"
-      ],
-      
-      // Matériel complémentaire par type de structure
-      complementaire: [
-        "Caméra thermique - détection défauts, humidité",
-        "Fissuromètre digital 0.05-5mm - mesure ouverture fissures",
-        "pH-mètre / Test carbonatation - profondeur carbonatation",
-        "Potentiel d'électrode - corrosion armatures",
-        "Gammagraphie - localisation exacte armatures/câbles",
-        "Géoradar - cartographie armatures 3D",
-        "Magnétoscopie - détection fissures surface/sous-surface",
-        "Ressuage (liquide pénétrant) - fissures débouchantes",
-        "Hygromètre à pointes - taux d'humidité bois",
-        "Résistographe - densité bois, détection altérations",
-        "Marteau de sondage - détection zones altérées",
-        "Pénétromètre bois - dureté superficielle",
-        "Détecteur insectes xylophages - inspection parasites",
-        "Jauge contrainte mécanique - déformations, flèches",
-        "Marteau géologue - identification matériaux",
-        "Nivellement laser - mesure déformations, tassements",
-        "Test compression in-situ - vérin plat",
-        "Test perméabilité Karsten - absorption eau",
-        "Loupe binoculaire x20 - analyse altérations",
-        "Colorimétrie - mesure altération chromatique"
-      ]
-    };
+    // Fonction pour détecter le type de caméra
+    function getCameraType(label) {
+      const lowerLabel = label.toLowerCase();
+      if (lowerLabel.includes('front') || lowerLabel.includes('user') || lowerLabel.includes('facetime')) {
+        return { type: 'front', icon: '🤳', name: 'Caméra frontale' };
+      } else if (lowerLabel.includes('back') || lowerLabel.includes('rear') || lowerLabel.includes('environment')) {
+        return { type: 'back', icon: '📱', name: 'Caméra arrière' };
+      } else {
+        return { type: 'unknown', icon: '📹', name: label || 'Caméra' };
+      }
+    }
 
-    // Matériel par type de structure (basé sur la liste complète)
-    const equipmentByStructure = {
-      beton_arme: [
-        ...completeEquipmentList.sondage_non_destructifs.slice(0, 6),
-        ...completeEquipmentList.sondage_destructifs.slice(0, 4),
-        ...completeEquipmentList.electricite,
-        ...completeEquipmentList.protection_nettoyage,
-        ...completeEquipmentList.rebouchage,
-        "Caméra thermique - détection défauts, humidité",
-        "Fissuromètre digital 0.05-5mm - mesure ouverture fissures",
-        "pH-mètre / Test carbonatation - profondeur carbonatation",
-        "Potentiel d'électrode - corrosion armatures"
-      ],
-      
-      beton_precontraint: [
-        ...completeEquipmentList.sondage_non_destructifs,
-        ...completeEquipmentList.sondage_destructifs.slice(0, 3),
-        ...completeEquipmentList.electricite,
-        ...completeEquipmentList.protection_nettoyage,
-        ...completeEquipmentList.location.slice(0, 2),
-        "Gammagraphie - localisation exacte armatures/câbles",
-        "Géoradar - cartographie armatures 3D",
-        "Fissuromètre électronique - monitoring continu"
-      ],
-      
-      charpente_metallique: [
-        ...completeEquipmentList.sondage_non_destructifs.slice(3, 8),
-        ...completeEquipmentList.sondage_destructifs.slice(4, 7),
-        ...completeEquipmentList.electricite,
-        ...completeEquipmentList.protection_nettoyage,
-        "Magnétoscopie - détection fissures surface/sous-surface",
-        "Ressuage (liquide pénétrant) - fissures débouchantes",
-        "Contrôle dimensionnel - pied à coulisse, palmer",
-        "Mesure épaisseur peinture - jauge revêtement",
-        "Contrôle boulonnerie - clé dynamométrique"
-      ],
-      
-      charpente_bois: [
-        ...completeEquipmentList.sondage_non_destructifs.slice(2, 6),
-        ...completeEquipmentList.sondage_destructifs.slice(6, 8),
-        ...completeEquipmentList.electricite,
-        ...completeEquipmentList.protection_nettoyage,
-        "Hygromètre à pointes - taux d'humidité bois",
-        "Résistographe - densité bois, détection altérations",
-        "Marteau de sondage - détection zones altérées",
-        "Pénétromètre bois - dureté superficielle",
-        "Détecteur insectes xylophages - inspection parasites",
-        "Jauge contrainte mécanique - déformations, flèches"
-      ],
-      
-      maconnerie_porteuse: [
-        ...completeEquipmentList.sondage_non_destructifs.slice(0, 4),
-        ...completeEquipmentList.sondage_destructifs.slice(0, 4),
-        ...completeEquipmentList.electricite,
-        ...completeEquipmentList.protection_nettoyage,
-        ...completeEquipmentList.rebouchage,
-        "Marteau géologue - identification matériaux",
-        "Nivellement laser - mesure déformations, tassements",
-        "Test compression in-situ - vérin plat"
-      ],
-      
-      pierre: [
-        ...completeEquipmentList.sondage_non_destructifs.slice(2, 7),
-        ...completeEquipmentList.sondage_destructifs.slice(0, 2),
-        ...completeEquipmentList.electricite,
-        ...completeEquipmentList.protection_nettoyage,
-        "Test perméabilité Karsten - absorption eau",
-        "Loupe binoculaire x20 - analyse altérations", 
-        "Colorimétrie - mesure altération chromatique",
-        "Fissuromètre - monitoring fissuration"
-      ],
-      
-      mixte_beton_acier: [
-        ...completeEquipmentList.sondage_non_destructifs.slice(0, 8),
-        ...completeEquipmentList.sondage_destructifs.slice(0, 6),
-        ...completeEquipmentList.electricite,
-        ...completeEquipmentList.protection_nettoyage,
-        ...completeEquipmentList.rebouchage,
-        "Magnétoscopie - fissures acier",
-        "Caméra thermique - défauts, délaminage",
-        "Potentiel électrode - corrosion"
-      ]
-    };
-
-    // Énumérer les caméras disponibles pour le module bâtiment
+    // Énumérer les caméras disponibles
     async function getBuildingCameras() {
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         availableBuildingCameras = devices.filter(device => device.kind === 'videoinput');
         
+        // Activer le bouton de changement de caméra s'il y en a plusieurs
+        const switchBtn = document.getElementById('switchCameraBuilding');
         if (availableBuildingCameras.length > 1) {
-          switchBuildingCamera.disabled = false;
-          switchBuildingCamera.title = `${availableBuildingCameras.length} caméras disponibles`;
-        } else {
-          switchBuildingCamera.disabled = true;
-          switchBuildingCamera.title = 'Une seule caméra disponible';
+          switchBtn.disabled = false;
         }
         
         return availableBuildingCameras;
       } catch (error) {
         console.warn('Impossible d\'énumérer les caméras', error);
-        switchBuildingCamera.disabled = true;
-        switchBuildingCamera.title = 'Erreur d\'accès aux caméras';
         return [];
       }
     }
 
     // Initialiser la webcam
-    async function setupBuildingWebcam(cameraIndex = 0) {
+    async function setupBuildingWebcam() {
       try {
         if (!navigator.mediaDevices?.getUserMedia) return;
 
@@ -442,57 +707,115 @@
 
         const constraints = {
           video: {
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
+            width: { ideal: isMobile ? 1280 : 1920 },
+            height: { ideal: isMobile ? 720 : 1080 }
           }
         };
 
-        if (cameras.length > 1 && cameras[cameraIndex]) {
-          constraints.video.deviceId = { exact: cameras[cameraIndex].deviceId };
+        // Utiliser la caméra sélectionnée ou par défaut la caméra arrière
+        if (cameras.length > 0) {
+          const selectedCamera = cameras[currentCameraIndex] || cameras[0];
+          constraints.video.deviceId = { exact: selectedCamera.deviceId };
+        } else if (isMobile) {
+          constraints.video.facingMode = 'environment'; // Caméra arrière par défaut
         }
 
         buildingStream = await navigator.mediaDevices.getUserMedia(constraints);
         buildingWebcam.srcObject = buildingStream;
         await buildingWebcam.play();
 
-        if (cameras.length > 1) {
-          buildingCameraInfo.style.display = 'block';
-          const cameraName = cameras[cameraIndex]?.label || `Caméra ${cameraIndex + 1}`;
-          buildingCameraLabel.textContent = `Caméra : ${cameraName}`;
+        // Mettre à jour le statut de la caméra
+        if (cameras.length > 0) {
+          const currentCamera = cameras[currentCameraIndex] || cameras[0];
+          const cameraInfo = getCameraType(currentCamera.label);
+          buildingCameraStatus.style.display = 'flex';
+          buildingCameraLabel.textContent = `📹 ${cameraInfo.name}`;
         }
 
       } catch (error) {
         console.warn('Accès webcam non disponible', error);
-        if (cameraIndex !== 0) {
-          setupBuildingWebcam(0);
+        // Fallback pour mobile
+        if (isMobile) {
+          try {
+            const fallbackConstraints = {
+              video: { facingMode: 'environment' }
+            };
+            buildingStream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+            buildingWebcam.srcObject = buildingStream;
+            await buildingWebcam.play();
+            
+            buildingCameraStatus.style.display = 'flex';
+            buildingCameraLabel.textContent = '📹 Caméra arrière';
+          } catch (fallbackError) {
+            console.warn('Fallback camera failed', fallbackError);
+          }
         }
       }
     }
 
     // Changer de caméra
-    switchBuildingCamera.addEventListener('click', async () => {
-      currentBuildingCameraIndex = (currentBuildingCameraIndex + 1) % availableBuildingCameras.length;
-      await setupBuildingWebcam(currentBuildingCameraIndex);
+    document.getElementById('switchCameraBuilding').addEventListener('click', async (e) => {
+      e.preventDefault();
+      if (availableBuildingCameras.length <= 1 || photoTaken) return;
+      
+      currentCameraIndex = (currentCameraIndex + 1) % availableBuildingCameras.length;
+      await setupBuildingWebcam();
     });
 
     // Capturer depuis webcam
     document.getElementById('captureBuilding').addEventListener('click', (e) => {
       e.preventDefault();
+      
+      if (photoTaken && !isAnalyzing) {
+        // Si une photo a déjà été prise et qu'on n'est pas en train d'analyser, on analysea
+        analyzeBuilding();
+        return;
+      }
+      
       if (!buildingStream) {
         alert('Caméra non disponible');
         return;
       }
       
+      // Prendre la photo
       buildingCanvas.width = buildingWebcam.videoWidth;
       buildingCanvas.height = buildingWebcam.videoHeight;
       buildingCtx.drawImage(buildingWebcam, 0, 0);
       const imageData = buildingCanvas.toDataURL('image/jpeg', 0.95);
       buildingImage.src = imageData;
       capturedImageData = imageData;
+      
+      // Afficher l'image et masquer la webcam
       buildingImage.style.display = 'block';
+      buildingImage.classList.add('photo-taken');
       buildingWebcam.style.display = 'none';
-      buildingCameraInfo.style.display = 'none';
+      buildingCameraStatus.style.display = 'none';
+      
+      // Marquer qu'une photo a été prise
+      photoTaken = true;
+      
+      // Changer le texte du bouton
+      document.getElementById('captureBuilding').textContent = '🔍 Analyser avec cette photo';
+      
+      // Désactiver le bouton de changement de caméra
+      document.getElementById('switchCameraBuilding').disabled = true;
     });
+
+    // Fonction d'analyse du bâtiment
+    function analyzeBuilding() {
+      if (!capturedImageData) return;
+      
+      isAnalyzing = true;
+      
+      // Simuler l'analyse (remplacer par vraie logique d'analyse)
+      setTimeout(() => {
+        // L'analyse garde automatiquement la photo
+        isAnalyzing = false;
+        
+        // Ici vous pouvez ajouter la logique d'analyse réelle
+        alert('Analyse terminée ! La photo a été conservée pour le diagnostic.');
+      }, 2000);
+    }
 
     // Upload fichier
     document.getElementById('uploadBuildingBtn').addEventListener('click', () => {
@@ -514,8 +837,13 @@
         buildingImage.src = ev.target.result;
         capturedImageData = ev.target.result;
         buildingImage.style.display = 'block';
+        buildingImage.classList.add('photo-taken');
         buildingWebcam.style.display = 'none';
-        buildingCameraInfo.style.display = 'none';
+        buildingCameraStatus.style.display = 'none';
+        
+        photoTaken = true;
+        document.getElementById('captureBuilding').textContent = '🔍 Analyser avec cette photo';
+        document.getElementById('switchCameraBuilding').disabled = true;
       };
       reader.readAsDataURL(file);
     });
@@ -540,19 +868,53 @@
           buildingImage.src = ev.target.result;
           capturedImageData = ev.target.result;
           buildingImage.style.display = 'block';
+          buildingImage.classList.add('photo-taken');
           buildingWebcam.style.display = 'none';
-          buildingCameraInfo.style.display = 'none';
+          buildingCameraStatus.style.display = 'none';
+          
+          photoTaken = true;
+          document.getElementById('captureBuilding').textContent = '🔍 Analyser avec cette photo';
+          document.getElementById('switchCameraBuilding').disabled = true;
         };
         reader.readAsDataURL(file);
       }
     });
 
-    // Créer la checklist complète d'équipement sur le site
+    // Fonction pour réinitialiser l'analyse
+    function resetBuildingAnalysis() {
+      photoTaken = false;
+      isAnalyzing = false;
+      capturedImageData = null;
+      
+      // Remettre l'interface dans l'état initial
+      buildingImage.style.display = 'none';
+      buildingImage.classList.remove('photo-taken');
+      buildingWebcam.style.display = 'block';
+      buildingCameraStatus.style.display = availableBuildingCameras.length > 0 ? 'flex' : 'none';
+      
+      // Remettre les boutons dans l'état initial
+      document.getElementById('captureBuilding').textContent = '📸 Prendre une photo';
+      document.getElementById('switchCameraBuilding').disabled = availableBuildingCameras.length <= 1;
+      
+      // Réinitialiser la caméra
+      currentCameraIndex = 0;
+      setupBuildingWebcam();
+      
+      // Masquer les résultats
+      buildingResult.style.display = 'none';
+      
+      // Scroll vers le haut
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Bouton nouvelle analyse
+    document.getElementById('newAnalysisBtn')?.addEventListener('click', resetBuildingAnalysis);
+
+    // Créer la checklist complète d'équipement
     function createEquipmentChecklist() {
       const checklist = document.getElementById('equipmentChecklist');
       checklist.innerHTML = '';
 
-      // Liste complète du matériel organisée par catégories (identique au PDF)
       const materielComplet = {
         'SONDAGE DESTRUCTIF': [
           'Carotteuse',
@@ -635,9 +997,7 @@
         ]
       };
 
-      // Créer l'interface par catégories
       Object.entries(materielComplet).forEach(([category, items]) => {
-        // Titre de catégorie
         const categoryDiv = document.createElement('div');
         categoryDiv.className = 'equipment-category';
         
@@ -646,7 +1006,6 @@
         categoryTitle.textContent = category;
         categoryDiv.appendChild(categoryTitle);
 
-        // Container pour les items de cette catégorie
         const itemsContainer = document.createElement('div');
         itemsContainer.className = 'equipment-items-grid';
 
@@ -672,7 +1031,6 @@
         checklist.appendChild(categoryDiv);
       });
 
-      // Activer les boutons de génération
       document.getElementById('generatePDF').disabled = false;
       document.getElementById('generateDevis').disabled = false;
     }
@@ -690,25 +1048,14 @@
       generateTechnicianPDF(selectedEquipment);
     });
 
-    function generateTechnicianPDF() {
-      // Récupérer seulement les équipements cochés
-      const selectedEquipment = Array.from(document.querySelectorAll('.equipment-checkbox:checked'))
-        .map(cb => cb.value);
-      
-      if (selectedEquipment.length === 0) {
-        alert('Veuillez sélectionner au moins un équipement');
-        return;
-      }
-
+    function generateTechnicianPDF(selectedEquipment) {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
       
-      // Couleurs COLZA/CIMEO
       const colzaOrange = [255, 127, 39];
       const colzaBlue = [0, 61, 126];
       const cimeoRose = [231, 76, 154];
       
-      // En-tête
       doc.setFillColor(255, 255, 255);
       doc.rect(0, 0, 210, 35, 'F');
       
@@ -732,7 +1079,6 @@
       doc.setDrawColor(...colzaOrange);
       doc.line(10, 35, 200, 35);
       
-      // Titre principal
       doc.setFillColor(240, 240, 240);
       doc.rect(10, 40, 190, 12, 'F');
       doc.setTextColor(...colzaBlue);
@@ -744,7 +1090,6 @@
       const refNum = `CIM-${Date.now().toString().slice(-6)}`;
       let yPos = 60;
       
-      // Informations générales - Version compacte
       doc.setFillColor(250, 250, 250);
       doc.rect(10, yPos, 190, 8, 'F');
       doc.setTextColor(...colzaBlue);
@@ -757,7 +1102,6 @@
       doc.setTextColor(0, 0, 0);
       doc.setFont(undefined, 'normal');
       
-      // Informations sur 3 lignes compactes
       doc.text(`Réf: ${refNum}`, 15, yPos);
       doc.text(`Date: ${date}`, 70, yPos);
       doc.text(`Projet: ${document.getElementById('resultBuildingType').textContent}`, 120, yPos);
@@ -768,7 +1112,6 @@
       doc.text(`Année: ${document.getElementById('resultYear').textContent}`, 120, yPos);
       yPos += 15;
       
-      // Liste du matériel sélectionné
       doc.setFillColor(240, 240, 240);
       doc.rect(10, yPos, 190, 12, 'F');
       doc.setTextColor(...colzaBlue);
@@ -783,11 +1126,9 @@
       doc.setTextColor(0, 0, 0);
       doc.setFont(undefined, 'normal');
       
-      // Afficher le matériel sélectionné en 2 colonnes
       for (let i = 0; i < selectedEquipment.length; i += 2) {
         if (yPos > 270) {
           doc.addPage();
-          // En-tête page suivante
           doc.setFillColor(...cimeoRose);
           doc.circle(25, 17, 8, 'F');
           doc.setTextColor(...colzaBlue);
@@ -803,13 +1144,11 @@
           doc.setFont(undefined, 'normal');
         }
         
-        // Colonne 1
         doc.setDrawColor(100, 100, 100);
         doc.setLineWidth(0.3);
         doc.rect(15, yPos - 2, 3, 3);
         doc.text(`☐ ${selectedEquipment[i]}`, 22, yPos);
         
-        // Colonne 2 (s'il y a un deuxième item)
         if (selectedEquipment[i + 1]) {
           doc.rect(105, yPos - 2, 3, 3);
           doc.text(`☐ ${selectedEquipment[i + 1]}`, 112, yPos);
@@ -818,7 +1157,6 @@
         yPos += 6;
       }
       
-      // Section notes en bas
       if (yPos > 240) {
         doc.addPage();
         yPos = 30;
@@ -834,7 +1172,6 @@
       doc.text('NOTES / OBSERVATIONS', 15, yPos + 6);
       yPos += 15;
       
-      // Zone de notes
       doc.setDrawColor(200, 200, 200);
       doc.setLineWidth(0.5);
       doc.rect(15, yPos, 170, 20);
@@ -842,7 +1179,6 @@
       doc.setTextColor(150, 150, 150);
       doc.text('Zone libre pour notes de terrain...', 17, yPos + 5);
       
-      // Pied de page sur toutes les pages
       const pageCount = doc.internal.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
@@ -853,7 +1189,6 @@
         doc.text(`Page ${i} sur ${pageCount}`, 170, 285);
       }
       
-      // Télécharger
       const filename = `CIMEO_Fiche_Materiel_${refNum}.pdf`;
       doc.save(filename);
     }
@@ -879,11 +1214,9 @@
       const date = new Date().toLocaleDateString('fr-FR');
       const refNum = `CIM-${Date.now().toString().slice(-6)}`;
       
-      // Récupérer les désordres cochés
       const issues = Array.from(document.querySelectorAll('.issue-checkbox:checked'))
         .map(cb => cb.nextElementSibling.textContent);
       
-      // Créer le contenu HTML qui sera transformé en Word
       const htmlContent = `
         <!DOCTYPE html>
         <html>
@@ -1028,7 +1361,6 @@
         </html>
       `;
       
-      // Créer un blob HTML et le télécharger comme fichier Word
       const blob = new Blob([htmlContent], { 
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
       });
@@ -1054,144 +1386,34 @@
       const year = document.getElementById('year').value;
       const location = document.getElementById('location').value;
       
-      // Afficher les résultats basiques
       document.getElementById('resultBuildingType').textContent = buildingType.options[buildingType.selectedIndex].text;
       document.getElementById('resultStructure').textContent = structureType.options[structureType.selectedIndex].text;
       document.getElementById('resultYear').textContent = year;
       document.getElementById('resultLocation').textContent = location;
       
-      // Créer la checklist complète d'équipement (toujours la même liste complète)
       createEquipmentChecklist();
       
-      // Afficher résultat
       buildingResult.style.display = 'block';
       buildingResult.classList.add('show');
       
-      // Scroll vers résultat
       setTimeout(() => {
-        window.scrollTo({
-          top: buildingResult.offsetTop - 100,
-          behavior: 'smooth'
-        });
+        buildingResult.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
     });
+
+    // Gestion responsive de l'orientation mobile
+    if (isMobile) {
+      window.addEventListener('orientationchange', () => {
+        setTimeout(() => {
+          if (buildingStream && !photoTaken) {
+            setupBuildingWebcam();
+          }
+        }, 500);
+      });
+    }
 
     // Initialiser
     setupBuildingWebcam();
   </script>
-
-  <style>
-    /* Styles additionnels pour les nouvelles fonctionnalités */
-    .camera-info {
-      text-align: center;
-      margin-top: 10px;
-      padding: 8px 16px;
-      background: linear-gradient(135deg, rgba(30, 58, 138, 0.1), rgba(59, 130, 246, 0.05));
-      border-radius: 20px;
-      font-size: 0.9rem;
-      color: var(--primary-dark);
-      font-weight: 500;
-    }
-
-    #switchBuildingCamera {
-      background: linear-gradient(135deg, #10b981, #059669);
-      color: white;
-    }
-
-    #switchBuildingCamera:hover:not(:disabled) {
-      transform: translateY(-3px);
-      box-shadow: 0 12px 30px rgba(16, 185, 129, 0.3);
-    }
-    
-    /* Styles pour la checklist d'équipement */
-    .equipment-checklist {
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-sm);
-      max-height: 400px;
-      overflow-y: auto;
-      padding: var(--spacing-md);
-      border: 2px solid var(--gray);
-      border-radius: 8px;
-      background: var(--light);
-    }
-
-    .equipment-checkbox-label {
-      display: flex;
-      align-items: flex-start;
-      gap: var(--spacing-md);
-      padding: var(--spacing-sm);
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-    }
-
-    .equipment-checkbox-label:hover {
-      background: rgba(30, 58, 138, 0.05);
-    }
-
-    .equipment-checkbox {
-      width: 20px;
-      height: 20px;
-      cursor: pointer;
-      accent-color: var(--primary);
-      flex-shrink: 0;
-      margin-top: 2px;
-    }
-
-    .equipment-checkbox-label span {
-      color: var(--dark);
-      font-size: 0.9rem;
-      line-height: 1.5;
-    }
-
-    .equipment-checkbox:checked + span {
-      color: var(--primary);
-      font-weight: 600;
-    }
-
-    .download-actions {
-      margin-top: var(--spacing-2xl);
-      padding-top: var(--spacing-xl);
-      border-top: 2px solid var(--gray);
-      display: flex;
-      gap: var(--spacing-md);
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-
-    .equipment-intro {
-      margin-bottom: var(--spacing-md);
-      color: var(--gray-dark);
-      font-size: 0.9rem;
-      font-style: italic;
-    }
-
-    /* Styles pour les catégories d'équipement */
-    .equipment-category {
-      margin-bottom: var(--spacing-lg);
-      border: 1px solid var(--gray);
-      border-radius: 8px;
-      overflow: hidden;
-    }
-
-    .equipment-category-title {
-      background: linear-gradient(135deg, rgba(30, 58, 138, 0.1), rgba(59, 130, 246, 0.05));
-      color: var(--primary-dark);
-      font-size: 0.95rem;
-      font-weight: 600;
-      margin: 0;
-      padding: var(--spacing-sm) var(--spacing-md);
-      border-bottom: 1px solid var(--gray);
-    }
-
-    .equipment-items-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: var(--spacing-xs);
-      padding: var(--spacing-sm);
-      background: var(--light);
-    }
-  </style>
 </body>
 </html>

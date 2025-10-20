@@ -6,6 +6,83 @@
   <title>CIMEO Normandie - Analyse de fissures par IA</title>
   <link rel="stylesheet" href="assets/style.css">
   <script src="assets/footer.js"></script>
+  <style>
+    /* Styles supplémentaires pour les contrôles de caméra */
+    .camera-controls {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .camera-controls .btn {
+      min-width: 160px;
+    }
+
+    .btn-camera-switch {
+      background: linear-gradient(135deg, #6b7280, #4b5563);
+      color: white;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-camera-switch:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(107, 114, 128, 0.3);
+    }
+
+    .btn-camera-switch:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Camera Status */
+    .camera-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+      border-radius: 20px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #1e40af;
+      margin-top: 12px;
+      justify-content: center;
+    }
+
+    /* Styles pour l'état de prise de photo */
+    .photo-taken {
+      border-color: #059669 !important;
+      box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
+    }
+
+    .media-element.photo-taken {
+      border-color: #059669;
+    }
+
+    /* States pour les boutons */
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* Responsive pour mobile */
+    @media (max-width: 768px) {
+      .camera-controls {
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .camera-controls .btn {
+        width: 100%;
+        max-width: 300px;
+      }
+    }
+  </style>
 </head>
 <body>
   <!-- Header -->
@@ -44,14 +121,23 @@
             <span class="upload-hint">L'IA analysera automatiquement la présence de fissures</span>
           </div>
 
-          <div class="controls">
+          <!-- Nouveaux contrôles caméra -->
+          <div class="camera-controls">
             <button type="button" id="captureBtn" class="btn btn-primary">
-              📸 Capturer avec caméra
+              📸 Prendre une photo
+            </button>
+            <button type="button" id="switchCameraBtn" class="btn btn-camera-switch" disabled>
+              🔄 Changer caméra
             </button>
             <button type="button" id="uploadBtn" class="btn btn-secondary">
               📤 Télécharger une image
             </button>
             <input type="file" id="fileInput" accept="image/*" style="display:none;">
+          </div>
+
+          <!-- Indicateur de caméra active -->
+          <div id="cameraStatus" class="camera-status" style="display:none;">
+            <span id="cameraLabel">📹 Caméra : Arrière</span>
           </div>
         </fieldset>
 
@@ -140,7 +226,7 @@
 
             <!-- Informations complémentaires si renseignées -->
             <div id="additionalInfo" class="additional-info" style="display:none;">
-              <h4>🔍 Informations complémentaires</h4>
+              <h4>📝 Informations complémentaires</h4>
               <p><strong>Matériau :</strong> <span id="resultMaterial"></span></p>
               <p><strong>Localisation :</strong> <span id="resultLocation"></span></p>
               <p><strong>Remarques :</strong> <span id="resultNotes"></span></p>
@@ -184,37 +270,155 @@
     const analyzeBtn = document.getElementById('analyzeBtn');
     const loadingSection = document.getElementById('loadingSection');
     const resultSection = document.getElementById('resultSection');
+    const cameraStatus = document.getElementById('cameraStatus');
+    const cameraLabel = document.getElementById('cameraLabel');
+
     let stream = null;
+    let availableCameras = [];
+    let currentCameraIndex = 0;
     let currentImageData = null;
+    let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    let photoTaken = false;
+    let isAnalyzing = false;
+
+    // Fonction pour détecter le type de caméra
+    function getCameraType(label) {
+      const lowerLabel = label.toLowerCase();
+      if (lowerLabel.includes('front') || lowerLabel.includes('user') || lowerLabel.includes('facetime')) {
+        return { type: 'front', icon: '🤳', name: 'Caméra frontale' };
+      } else if (lowerLabel.includes('back') || lowerLabel.includes('rear') || lowerLabel.includes('environment')) {
+        return { type: 'back', icon: '📱', name: 'Caméra arrière' };
+      } else {
+        return { type: 'unknown', icon: '📹', name: label || 'Caméra' };
+      }
+    }
+
+    // Énumérer les caméras disponibles
+    async function getCameras() {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        availableCameras = devices.filter(device => device.kind === 'videoinput');
+        
+        // Activer le bouton de changement de caméra s'il y en a plusieurs
+        const switchBtn = document.getElementById('switchCameraBtn');
+        if (availableCameras.length > 1) {
+          switchBtn.disabled = false;
+        }
+        
+        return availableCameras;
+      } catch (error) {
+        console.warn('Impossible d\'énumérer les caméras', error);
+        return [];
+      }
+    }
 
     // Initialiser la webcam
     async function setupWebcam() {
       try {
         if (!navigator.mediaDevices?.getUserMedia) return;
-        stream = await navigator.mediaDevices.getUserMedia({ 
+
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
+
+        const cameras = await getCameras();
+        if (cameras.length === 0) return;
+
+        const constraints = {
           video: { 
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
+            width: { ideal: isMobile ? 1280 : 1920 },
+            height: { ideal: isMobile ? 720 : 1080 }
           } 
-        });
+        };
+
+        // Utiliser la caméra sélectionnée ou par défaut la caméra arrière
+        if (cameras.length > 0) {
+          const selectedCamera = cameras[currentCameraIndex] || cameras[0];
+          constraints.video.deviceId = { exact: selectedCamera.deviceId };
+        } else if (isMobile) {
+          constraints.video.facingMode = 'environment'; // Caméra arrière par défaut
+        }
+
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
         webcam.srcObject = stream;
         await webcam.play();
+
+        // Mettre à jour le statut de la caméra
+        if (cameras.length > 0) {
+          const currentCamera = cameras[currentCameraIndex] || cameras[0];
+          const cameraInfo = getCameraType(currentCamera.label);
+          cameraStatus.style.display = 'flex';
+          cameraLabel.textContent = `📹 ${cameraInfo.name}`;
+        }
+
       } catch (error) {
         console.warn('Accès webcam non disponible', error);
+        // Fallback pour mobile
+        if (isMobile) {
+          try {
+            const fallbackConstraints = {
+              video: { facingMode: 'environment' }
+            };
+            stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+            webcam.srcObject = stream;
+            await webcam.play();
+            
+            cameraStatus.style.display = 'flex';
+            cameraLabel.textContent = '📹 Caméra arrière';
+          } catch (fallbackError) {
+            console.warn('Fallback camera failed', fallbackError);
+          }
+        }
       }
     }
 
+    // Changer de caméra
+    document.getElementById('switchCameraBtn').addEventListener('click', async (e) => {
+      e.preventDefault();
+      if (availableCameras.length <= 1 || photoTaken) return;
+      
+      currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
+      await setupWebcam();
+    });
+
     // Capturer depuis webcam
-    document.getElementById('captureBtn').addEventListener('click', () => {
+    document.getElementById('captureBtn').addEventListener('click', (e) => {
+      e.preventDefault();
+      
+      if (photoTaken && !isAnalyzing) {
+        // Si une photo a déjà été prise et qu'on n'est pas en train d'analyser, on analyse
+        performAIAnalysis();
+        return;
+      }
+      
+      if (!stream) {
+        alert('Caméra non disponible');
+        return;
+      }
+      
+      // Prendre la photo
       canvas.width = webcam.videoWidth;
       canvas.height = webcam.videoHeight;
       ctx.drawImage(webcam, 0, 0);
       const imageData = canvas.toDataURL('image/jpeg', 0.95);
       imageElement.src = imageData;
       currentImageData = imageData;
+      
+      // Afficher l'image et masquer la webcam
       imageElement.style.display = 'block';
+      imageElement.classList.add('photo-taken');
       webcam.style.display = 'none';
+      cameraStatus.style.display = 'none';
+      
+      // Marquer qu'une photo a été prise
+      photoTaken = true;
       analyzeBtn.disabled = false;
+      
+      // Changer le texte du bouton
+      document.getElementById('captureBtn').textContent = '🔍 Analyser avec cette photo';
+      
+      // Désactiver le bouton de changement de caméra
+      document.getElementById('switchCameraBtn').disabled = true;
     });
 
     // Upload fichier
@@ -237,8 +441,14 @@
         imageElement.src = ev.target.result;
         currentImageData = ev.target.result;
         imageElement.style.display = 'block';
+        imageElement.classList.add('photo-taken');
         webcam.style.display = 'none';
+        cameraStatus.style.display = 'none';
+        
+        photoTaken = true;
         analyzeBtn.disabled = false;
+        document.getElementById('captureBtn').textContent = '🔍 Analyser avec cette photo';
+        document.getElementById('switchCameraBtn').disabled = true;
       };
       reader.readAsDataURL(file);
     });
@@ -264,8 +474,14 @@
           imageElement.src = ev.target.result;
           currentImageData = ev.target.result;
           imageElement.style.display = 'block';
+          imageElement.classList.add('photo-taken');
           webcam.style.display = 'none';
+          cameraStatus.style.display = 'none';
+          
+          photoTaken = true;
           analyzeBtn.disabled = false;
+          document.getElementById('captureBtn').textContent = '🔍 Analyser avec cette photo';
+          document.getElementById('switchCameraBtn').disabled = true;
         };
         reader.readAsDataURL(file);
       }
@@ -284,8 +500,7 @@
         loadingSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }, 100);
 
-      // Simulation de l'analyse IA (remplacer par vraie API)
-      // ICI TU INTÉGRERAS TON MODÈLE IA
+      // Lancer l'analyse
       setTimeout(() => {
         performAIAnalysis();
       }, 3000);
@@ -293,6 +508,10 @@
 
     // Fonction d'analyse IA (à remplacer par ton vrai modèle)
     function performAIAnalysis() {
+      if (!currentImageData) return;
+      
+      isAnalyzing = true;
+      
       // SIMULATION - Remplace cette partie par ton API/modèle IA réel
       const fissureDetected = Math.random() > 0.3; // 70% de chance de détecter
       
@@ -330,28 +549,63 @@
         document.getElementById('fissureResult').style.display = 'none';
       }
 
+      // L'analyse garde automatiquement la photo (pas de reset automatique)
+      isAnalyzing = false;
+
       // Scroll vers résultat
       setTimeout(() => {
         resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
     }
 
-    // Boutons de réinitialisation
+    // Fonction pour réinitialiser l'analyse
     function resetAnalysis() {
+      photoTaken = false;
+      isAnalyzing = false;
       currentImageData = null;
+      
+      // Remettre l'interface dans l'état initial
       imageElement.style.display = 'none';
+      imageElement.classList.remove('photo-taken');
       webcam.style.display = 'block';
+      cameraStatus.style.display = availableCameras.length > 0 ? 'flex' : 'none';
+      
+      // Remettre les boutons dans l'état initial
+      document.getElementById('captureBtn').textContent = '📸 Prendre une photo';
+      document.getElementById('switchCameraBtn').disabled = availableCameras.length <= 1;
+      analyzeBtn.disabled = true;
+      
+      // Réinitialiser les résultats
       resultSection.style.display = 'none';
       loadingSection.style.display = 'none';
-      analyzeBtn.disabled = true;
+      
+      // Réinitialiser le formulaire
       document.getElementById('materialType').value = '';
       document.getElementById('location').value = '';
       document.getElementById('notes').value = '';
+      
+      // Réinitialiser la caméra
+      currentCameraIndex = 0;
+      setupWebcam();
+      
+      // Scroll vers le haut
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
+    // Boutons de réinitialisation
     document.getElementById('retryBtn')?.addEventListener('click', resetAnalysis);
     document.getElementById('newAnalysisBtn')?.addEventListener('click', resetAnalysis);
+
+    // Gestion responsive de l'orientation mobile
+    if (isMobile) {
+      window.addEventListener('orientationchange', () => {
+        setTimeout(() => {
+          if (stream && !photoTaken) {
+            setupWebcam();
+          }
+        }, 500);
+      });
+    }
 
     // Initialiser
     setupWebcam();
